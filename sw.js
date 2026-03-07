@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dungeon-crawler-v1';
+const CACHE_NAME = 'dungeon-crawler-v2';
 // Список файлов, которые нужно закэшировать. 
 // Обязательно добавьте сюда ваши иконки!
 const FILES_TO_CACHE = [
@@ -17,6 +17,20 @@ self.addEventListener('install', (evt) => {
     })
   );
   self.skipWaiting();
+});
+
+// При активации Service Worker'а удаляем старые кэши
+self.addEventListener('activate', (evt) => {
+  evt.waitUntil(
+    caches.keys().then((keyList) => {
+      return Promise.all(keyList.map((key) => {
+        if (key !== CACHE_NAME) {
+          return caches.delete(key);
+        }
+      }));
+    })
+  );
+  self.clients.claim();
 });
 
 // При запросах к сети используем кэш
