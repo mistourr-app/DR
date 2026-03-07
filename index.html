@@ -1494,17 +1494,17 @@
             // Текст
             ctx.textAlign = "center";
             ctx.fillStyle = "#ef4444";
-            ctx.font = `bold ${getFontSize(9)}px Inter`;
+            ctx.font = "bold 9px Inter";
             ctx.fillText("БОСС", w/2, 18);
 
             // Здоровье
             ctx.fillStyle = "#fff";
-            ctx.font = `900 ${getFontSize(22)}px Inter`;
+            ctx.font = "900 22px Inter";
             ctx.fillText(Math.max(0, boss.hp), w/2, h/2 + 2);
             
             // Подпись HP
             ctx.fillStyle = "#ef4444";
-            ctx.font = `${getFontSize(8)}px Inter`;
+            ctx.font = "8px Inter";
             ctx.fillText("HEALTH", w/2, h/2 + 12);
 
             ctx.restore();
@@ -1577,7 +1577,7 @@
                 ctx.save();
                 ctx.globalAlpha = Math.min(1, ft.life / 30); // Текст плавно исчезает
                 ctx.fillStyle = ft.color;
-                ctx.font = `900 ${getFontSize(20)}px Inter`;
+                ctx.font = "900 20px Inter";
                 ctx.textAlign = "center";
                 ctx.shadowColor = "rgba(0,0,0,0.7)";
                 ctx.shadowBlur = 4;
@@ -1807,7 +1807,7 @@
                 ctx.fillStyle = "#2d313d";
                 ctx.fillRect(w*0.1, h*0.1, w*0.8, h*0.8);
                 ctx.fillStyle = "#3f4556";
-                ctx.font = `bold ${getFontSize(10)}px Inter`;
+                ctx.font = "bold 10px Inter";
                 ctx.fillText("БЛОК", w/2, h/2 + 4);
             }
 
@@ -1827,60 +1827,60 @@
 
                 // Заголовок
                 ctx.fillStyle = isAlert ? "#ef4444" : "#94a3b8";
-                ctx.font = `bold ${getFontSize(9)}px Inter`;
+                ctx.font = "bold 9px Inter";
                 ctx.fillText(d.label, w/2, 18);
 
                 // HP Врага
                 ctx.fillStyle = "#fff";
-                ctx.font = `900 ${getFontSize(24)}px Inter`;
+                ctx.font = "900 24px Inter";
                 ctx.fillText(d.currentHp, w/2, h/2 + 8);
             }
 
             if (cell.type === OBJECT_TYPES.HEAL) {
                 ctx.fillStyle = "#10b981";
-                ctx.font = `bold ${getFontSize(10)}px Inter`;
+                ctx.font = "bold 10px Inter";
                 ctx.fillText("ЗДОРОВЬЕ", w/2, 18);
-                ctx.font = `900 ${getFontSize(24)}px Inter`;
+                ctx.font = "900 24px Inter";
                 ctx.fillText("+6", w/2, h/2 + 8);
             }
 
             if (cell.type === OBJECT_TYPES.ENERGY) {
                 ctx.fillStyle = "#06b6d4";
-                ctx.font = `bold ${getFontSize(10)}px Inter`;
+                ctx.font = "bold 10px Inter";
                 ctx.fillText("ЭНЕРГИЯ", w/2, 18);
-                ctx.font = `900 ${getFontSize(24)}px Inter`;
+                ctx.font = "900 24px Inter";
                 ctx.fillText("+4", w/2, h/2 + 8);
             }
 
             if (cell.type === OBJECT_TYPES.ATTACK_BOOST) {
                 ctx.fillStyle = "#f59e0b";
-                ctx.font = `bold ${getFontSize(10)}px Inter`;
+                ctx.font = "bold 10px Inter";
                 ctx.fillText(cell.data.label, w/2, 18);
-                ctx.font = `900 ${getFontSize(24)}px Inter`;
+                ctx.font = "900 24px Inter";
                 ctx.fillText(`+${cell.data.value}`, w/2, h/2 + 8);
             }
 
             if (cell.type === OBJECT_TYPES.DEFENSE_BOOST) {
                 ctx.fillStyle = "#3b82f6";
-                ctx.font = `bold ${getFontSize(10)}px Inter`;
+                ctx.font = "bold 10px Inter";
                 ctx.fillText(cell.data.label, w/2, 18);
-                ctx.font = `900 ${getFontSize(24)}px Inter`;
+                ctx.font = "900 24px Inter";
                 ctx.fillText(`+${cell.data.value}`, w/2, h/2 + 8);
             }
 
             if (cell.type === OBJECT_TYPES.AMMO) {
                 ctx.fillStyle = "#a855f7";
-                ctx.font = `bold ${getFontSize(10)}px Inter`;
+                ctx.font = "bold 10px Inter";
                 ctx.fillText("ЗАРЯДЫ", w/2, 18);
-                ctx.font = `900 ${getFontSize(24)}px Inter`;
+                ctx.font = "900 24px Inter";
                 ctx.fillText("+3", w/2, h/2 + 8);
             }
 
             if (cell.type === OBJECT_TYPES.BOSS_DAMAGE) {
                 ctx.fillStyle = "#ef4444";
-                ctx.font = `bold ${getFontSize(10)}px Inter`;
+                ctx.font = "bold 10px Inter";
                 ctx.fillText("АТАКА", w/2, 18);
-                ctx.font = `900 ${getFontSize(24)}px Inter`;
+                ctx.font = "900 24px Inter";
                 ctx.fillText(`${cell.data.value}`, w/2, h/2 + 8);
             }
 
@@ -1911,22 +1911,22 @@
             // Текст
             ctx.textAlign = "center";
             ctx.fillStyle = "#4ade80";
-            ctx.font = `bold ${getFontSize(9)}px Inter`;
+            ctx.font = "bold 9px Inter";
             ctx.fillText("ИГРОК", w/2, 18);
 
             // Здоровье
             ctx.fillStyle = "#fff";
-            ctx.font = `900 ${getFontSize(22)}px Inter`;
+            ctx.font = "900 22px Inter";
             ctx.fillText(Math.max(0, p.hp), w/2, h/2 + 2);
             
             // Подпись HP
             ctx.fillStyle = "#4ade80";
-            ctx.font = `${getFontSize(8)}px Inter`;
+            ctx.font = "8px Inter";
             ctx.fillText("HEALTH", w/2, h/2 + 12);
 
             // Энергия (снизу)
             ctx.fillStyle = "#06b6d4";
-            ctx.font = `bold ${getFontSize(10)}px Inter`;
+            ctx.font = "bold 10px Inter";
             ctx.fillText(`EN: ${p.energy}`, w/2, h - 12);
 
 
