@@ -365,9 +365,13 @@
 
         // Функция для пересчета порогов вероятности
         function calculateChanceThresholds(chances) {
+            // Новая, более надежная логика "рулетки"
             const thresholds = {};
-            let cumulative = 100;
-            for (const key in chances) { cumulative -= chances[key]; thresholds[key] = cumulative / 100; }
+            let cumulative = 0;
+            for (const key in chances) {
+                cumulative += chances[key];
+                thresholds[key] = cumulative / 100;
+            }
             return thresholds;
         }
 
@@ -706,7 +710,7 @@
             const chances = levelConf.chances;
             const thresholds = calculateChanceThresholds(chances);
 
-            const BOSS_AREA_ROWS = 3;
+            const BOSS_AREA_ROWS = 1;
             const playableRows = totalRows; // Не вычитаем, т.к. босс находится в пределах этих рядов
             gameState.rows = [];
             for (let y = 0; y < playableRows; y++) {
@@ -716,18 +720,19 @@
                     const rand = Math.random();
 
                     // Генерируем объекты только до зоны босса
-                    if (y > 1 && y < totalRows - BOSS_AREA_ROWS) { 
-                        if (rand > thresholds[OBJECT_TYPES.ENEMY]) {
+                    if (y >= 0 && y < totalRows - BOSS_AREA_ROWS) { 
+                        // Новая логика проверки шансов
+                        if (rand < thresholds[OBJECT_TYPES.ENEMY]) {
                             type = OBJECT_TYPES.ENEMY;
                             const eType = Math.random() > 0.5 ? 'TYPE_1' : 'TYPE_2';
                             data = { ...ENEMY_TYPES[eType], state: ENEMY_STATES.IDLE, currentHp: ENEMY_TYPES[eType].hp };
                         }
-                        else if (rand > thresholds[OBJECT_TYPES.WALL]) type = OBJECT_TYPES.WALL;
-                        else if (rand > thresholds[OBJECT_TYPES.HEAL]) type = OBJECT_TYPES.HEAL;
-                        else if (rand > thresholds[OBJECT_TYPES.ENERGY]) type = OBJECT_TYPES.ENERGY;
-                        else if (rand > thresholds[OBJECT_TYPES.ATTACK_BOOST]) { type = OBJECT_TYPES.ATTACK_BOOST; data = { ...ITEM_VALUES.ATTACK_BOOST }; }
-                        else if (rand > thresholds[OBJECT_TYPES.DEFENSE_BOOST]) { type = OBJECT_TYPES.DEFENSE_BOOST; data = { ...ITEM_VALUES.DEFENSE_BOOST }; }
-                        else if (rand > thresholds[OBJECT_TYPES.AMMO]) type = OBJECT_TYPES.AMMO;
+                        else if (rand < thresholds[OBJECT_TYPES.WALL]) type = OBJECT_TYPES.WALL;
+                        else if (rand < thresholds[OBJECT_TYPES.HEAL]) type = OBJECT_TYPES.HEAL;
+                        else if (rand < thresholds[OBJECT_TYPES.ENERGY]) type = OBJECT_TYPES.ENERGY;
+                        else if (rand < thresholds[OBJECT_TYPES.ATTACK_BOOST]) { type = OBJECT_TYPES.ATTACK_BOOST; data = { ...ITEM_VALUES.ATTACK_BOOST }; }
+                        else if (rand < thresholds[OBJECT_TYPES.DEFENSE_BOOST]) { type = OBJECT_TYPES.DEFENSE_BOOST; data = { ...ITEM_VALUES.DEFENSE_BOOST }; }
+                        else if (rand < thresholds[OBJECT_TYPES.AMMO]) type = OBJECT_TYPES.AMMO;
                     }
                     row.push({ type, data });
                 }
@@ -921,9 +926,12 @@
 
             // Если это клетка атаки, наносим урон боссу
             if (cell.type === OBJECT_TYPES.BOSS_DAMAGE) {
-                gameState.boss.hp -= cell.data.value;
-                spawnFloatingText(`-${cell.data.value}`, gameState.boss.pos.x, gameState.boss.pos.y, '#fca5a5');
-                message(`АТАКА КЛЕТКОЙ: БОСС -${cell.data.value}HP`);
+                const { remainingDamage, blockedAmount } = applyAndConsumeDefenseBoosts(cell.data.value, 'boss');
+                gameState.boss.hp -= remainingDamage;
+                spawnFloatingText(`-${remainingDamage}`, gameState.boss.pos.x, gameState.boss.pos.y, '#fca5a5');
+                let logMessage = `АТАКА КЛЕТКОЙ: БОСС -${remainingDamage}HP`;
+                if (blockedAmount > 0) logMessage += ` (Блок: ${blockedAmount})`;
+                message(logMessage);
             }
 
             // Проверка на атаку в ближнем бою
@@ -1234,9 +1242,13 @@
                     const bonusDamage = applyAndConsumeAttackBoosts(gameState.boss.pos.x, gameState.boss.pos.y, 'player');
                     p.weapon.charges--;
                     p.hasFiredWeaponThisTurn = true;
-                    gameState.boss.hp -= p.weapon.attack;
-                    spawnFloatingText(`-${p.weapon.attack}`, gameState.boss.pos.x, gameState.boss.pos.y, '#fca5a5');
-                    message(`ВЫСТРЕЛ ПО БОССУ: -${p.weapon.attack}HP${bonusDamage > 0 ? ` (Бонус: ${bonusDamage})` : ''}`);
+
+                    const { remainingDamage, blockedAmount } = applyAndConsumeDefenseBoosts(p.weapon.attack, 'boss');
+                    gameState.boss.hp -= remainingDamage;
+                    spawnFloatingText(`-${remainingDamage}`, gameState.boss.pos.x, gameState.boss.pos.y, '#fca5a5');
+                    let logMessage = `ВЫСТРЕЛ ПО БОССУ: -${remainingDamage}HP${bonusDamage > 0 ? ` (Бонус: ${bonusDamage})` : ''}`;
+                    if (blockedAmount > 0) logMessage += ` (Блок: ${blockedAmount})`;
+                    message(logMessage);
                     renderInventory();
                     checkWinLoss(); // Проверяем, не был ли босс побежден выстрелом
                 } else {
