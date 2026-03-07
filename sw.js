@@ -13,7 +13,12 @@ const FILES_TO_CACHE = [
 self.addEventListener('install', (evt) => {
   evt.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(FILES_TO_CACHE);
+      // Используем addAll, так как все основные файлы должны быть закэшированы для оффлайн-работы.
+      // Если какой-то файл не найден, установка Service Worker'а прервется,
+      // что явно укажет на проблему (например, опечатку в имени файла).
+      return cache.addAll(FILES_TO_CACHE).catch(err => {
+        console.error('Failed to cache initial assets:', err);
+      });
     })
   );
   self.skipWaiting();
