@@ -31,6 +31,15 @@ function resize() {
   canvas.style.height = `${DIMS.CANVAS_HEIGHT}px`;
   
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  
+  console.log('Resize:', {
+    screenW, screenH, dpr,
+    CELL_SIZE: DIMS.CELL_SIZE,
+    CANVAS_WIDTH: DIMS.CANVAS_WIDTH,
+    CANVAS_HEIGHT: DIMS.CANVAS_HEIGHT,
+    physicalWidth: canvas.width,
+    physicalHeight: canvas.height
+  });
 
   document.getElementById('top-ui-bar').style.height = `${DIMS.TOP_UI_H}px`;
   document.getElementById('bottom-ui-bar').style.height = `${DIMS.BOTTOM_UI_H}px`;
@@ -96,6 +105,10 @@ function update(deltaTime) {
 
 function render() {
   ctx.clearRect(0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
+  
+  // Тестовый рендер - красный прямоугольник
+  ctx.fillStyle = 'red';
+  ctx.fillRect(10, 10, 50, 50);
 
   const state = getGameState();
   switch (state.appState) {
