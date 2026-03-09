@@ -16,7 +16,6 @@ let lastTime = 0;
 function resize() {
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
-  const dpr = window.devicePixelRatio || 1;
 
   const availableHeight = screenH - DIMS.TOP_UI_H - DIMS.BOTTOM_UI_H;
   const size = Math.floor(Math.min(screenW / DIMS.COLS, availableHeight / (DIMS.VISIBLE_ROWS + 1)));
@@ -25,21 +24,8 @@ function resize() {
   DIMS.CANVAS_WIDTH = DIMS.COLS * DIMS.CELL_SIZE;
   DIMS.CANVAS_HEIGHT = (DIMS.VISIBLE_ROWS + 1) * DIMS.CELL_SIZE;
 
-  canvas.width = DIMS.CANVAS_WIDTH * dpr;
-  canvas.height = DIMS.CANVAS_HEIGHT * dpr;
-  canvas.style.width = `${DIMS.CANVAS_WIDTH}px`;
-  canvas.style.height = `${DIMS.CANVAS_HEIGHT}px`;
-  
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  
-  console.log('Resize:', {
-    screenW, screenH, dpr,
-    CELL_SIZE: DIMS.CELL_SIZE,
-    CANVAS_WIDTH: DIMS.CANVAS_WIDTH,
-    CANVAS_HEIGHT: DIMS.CANVAS_HEIGHT,
-    physicalWidth: canvas.width,
-    physicalHeight: canvas.height
-  });
+  canvas.width = DIMS.CANVAS_WIDTH;
+  canvas.height = DIMS.CANVAS_HEIGHT;
 
   document.getElementById('top-ui-bar').style.height = `${DIMS.TOP_UI_H}px`;
   document.getElementById('bottom-ui-bar').style.height = `${DIMS.BOTTOM_UI_H}px`;
@@ -105,10 +91,6 @@ function update(deltaTime) {
 
 function render() {
   ctx.clearRect(0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
-  
-  // Тестовый рендер - красный прямоугольник
-  ctx.fillStyle = 'red';
-  ctx.fillRect(10, 10, 50, 50);
 
   const state = getGameState();
   switch (state.appState) {
@@ -137,10 +119,8 @@ function handleCanvasClick(event) {
   if (state.appState !== AppState.RUN_PLAYING || isAnimating()) return;
 
   const rect = canvas.getBoundingClientRect();
-  const scaleX = DIMS.CANVAS_WIDTH / rect.width;
-  const scaleY = DIMS.CANVAS_HEIGHT / rect.height;
-  const canvasX = (event.clientX - rect.left) * scaleX;
-  const canvasY = (event.clientY - rect.top) * scaleY;
+  const canvasX = event.clientX - rect.left;
+  const canvasY = event.clientY - rect.top;
 
   const gx = Math.floor(canvasX / DIMS.CELL_SIZE);
 
