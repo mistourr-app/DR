@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dungeon-crawler-v4';
+const CACHE_NAME = 'dungeon-crawler-v5';
 const FILES_TO_CACHE = [
   './',
   './index.html',
