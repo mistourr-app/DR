@@ -249,6 +249,7 @@ function processPlayerMove(targetX, targetY) {
     duration: 250,
     onComplete: () => {
       const previousY = player.pos.y;
+      const previousX = player.pos.x;
       player.pos.x = targetX;
       player.pos.y = targetY;
 
@@ -375,7 +376,7 @@ function processPlayerMove(targetX, targetY) {
               duration: 700,
               onComplete: () => {}
             });
-            continuePlayerTurnAfterInteraction(previousY, targetY);
+            continuePlayerTurnAfterInteraction(previousY, previousX, targetY);
           } else {
             play({
               target: targetCell,
@@ -421,8 +422,9 @@ function processPlayerMove(targetX, targetY) {
 
       if (runState.levelPhase === 'dungeon') {
         const rowPlayerLeft = previousY;
+        const colPlayerLeft = previousX;
         if (targetCell.type !== OBJECT_TYPES.ENEMY) {
-          continuePlayerTurnAfterInteraction(rowPlayerLeft, targetY);
+          continuePlayerTurnAfterInteraction(rowPlayerLeft, colPlayerLeft, targetY);
         }
       }
       if (targetCell.type !== OBJECT_TYPES.ENEMY && runState.levelPhase === 'dungeon') {
@@ -515,10 +517,10 @@ function processPlayerShotOnBoss(bossCell) {
   });
 }
 
-function continuePlayerTurnAfterInteraction(previousPlayerY, targetY) {
+function continuePlayerTurnAfterInteraction(previousPlayerY, previousPlayerX, targetY) {
   const { runState } = getGameState();
   const { rows } = runState;
-  processEnemyTurns(previousPlayerY, () => {
+  processEnemyTurns(previousPlayerY, { x: previousPlayerX, y: previousPlayerY }, () => {
     if (runState.levelPhase === 'dungeon') {
       runState.targetScrollY = getRowY(targetY, runState.totalRows);
     }
