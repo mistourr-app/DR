@@ -84,6 +84,7 @@ export function getThreatMaps(rows, playerPos) {
 
 export function processEnemyTurns(y, onAllAttacksComplete) {
   const { player, rows } = getGameState().runState;
+  console.log('processEnemyTurns called for row:', y);
   if (y < 0) {
     onAllAttacksComplete();
     return;
@@ -94,11 +95,13 @@ export function processEnemyTurns(y, onAllAttacksComplete) {
     const cell = rows[y][x];
     if (cell.type === OBJECT_TYPES.ENEMY && cell.data) {
       if (canEnemySeePlayer(cell.data, x, y, player.pos, rows)) {
+        console.log('Enemy at', x, y, 'can see player, attacking!');
         attackingEnemies.push(cell);
       }
     }
   }
 
+  console.log('Attacking enemies:', attackingEnemies.length);
   if (attackingEnemies.length === 0) {
     onAllAttacksComplete();
     return;
