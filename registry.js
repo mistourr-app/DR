@@ -50,16 +50,19 @@ export const CELL_DEFS = {
   [OBJECT_TYPES.HEAL]: {
     label: 'ЗДОРОВЬЕ',
     value: '+6',
+    amount: 6,
     color: '#10b981',
   },
   [OBJECT_TYPES.AMMO]: {
     label: 'ЗАРЯДЫ',
     value: '+2',
+    amount: 2,
     color: '#f59e0b', // Amber color
   },
   [OBJECT_TYPES.ENERGY]: {
     label: 'ЭНЕРГИЯ',
     value: '+10',
+    amount: 10,
     color: '#3b82f6', // Blue color
   },
   [OBJECT_TYPES.ATTACK_BONUS]: {

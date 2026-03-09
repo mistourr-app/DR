@@ -32,6 +32,22 @@ export function dealDamageToPlayer(incomingDamage, source = null) {
   player.hp -= totalDamageTaken;
 
   if (totalDamageTaken > 0) {
+    const floatingText = {
+      id: Date.now() + Math.random(),
+      text: `-${totalDamageTaken}`,
+      color: '#ef4444',
+      visual: { 
+        x: player.visual.x, 
+        y: player.visual.y + 32,
+        alpha: 1.0 
+      },
+    };
+    runState.floatingTexts.push(floatingText);
+    
+    const gameContainer = document.getElementById('game-container');
+    gameContainer.classList.add('damage-flash');
+    setTimeout(() => gameContainer.classList.remove('damage-flash'), 300);
+    
     emit(Events.PLAYER_DAMAGED, { damage: totalDamageTaken, source });
   }
 
@@ -48,10 +64,8 @@ export function dealDamageToEnemy(enemyCell, baseDamage, consumeBonuses = false)
   const { player } = runState;
   const enemy = enemyCell.data;
 
-  const actualDamageDealt = Math.min(baseDamage, enemy.currentHp);
-
   if (consumeBonuses) {
-    let damageToConsumeFromBonuses = actualDamageDealt;
+    let damageToConsumeFromBonuses = baseDamage;
 
     for (let i = player.inventory.attackBonuses.length - 1; i >= 0; i--) {
       const bonus = player.inventory.attackBonuses[i];
@@ -67,7 +81,8 @@ export function dealDamageToEnemy(enemyCell, baseDamage, consumeBonuses = false)
     }
   }
 
-  enemy.currentHp -= baseDamage;
+  const actualDamageDealt = Math.min(baseDamage, enemy.currentHp);
+  enemy.currentHp -= actualDamageDealt;
   emit(Events.ENEMY_ATTACKED, { enemy, damage: actualDamageDealt });
 
   return actualDamageDealt;
@@ -129,7 +144,7 @@ export function processMeleeCombat(enemyCell) {
 
 export function processPlayerMeleeOnBoss() {
   const { runState } = getGameState();
-  const { player, boss } = runState;
+  const { player, boss, rows } = runState;
 
   if (player.inventory.attackBonuses.length === 0) return;
 
@@ -139,5 +154,20 @@ export function processPlayerMeleeOnBoss() {
   player.inventory.attackBonuses = [];
 
   dealDamageToBoss(damage);
+  
+  const bossCell = rows[boss.pos.y][boss.pos.x];
+  // Создаем всплывающий текст
+  const floatingText = {
+    id: Date.now() + Math.random(),
+    text: `-${damage}`,
+    color: '#ef4444',
+    visual: { 
+      x: bossCell.visual.x, 
+      y: bossCell.visual.y + 64,
+      alpha: 1.0 
+    },
+  };
+  runState.floatingTexts.push(floatingText);
+  
   emit(Events.PLAYER_ATTACKED, { target: 'boss', damage });
 }

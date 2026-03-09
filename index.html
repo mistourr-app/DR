@@ -36,6 +36,13 @@
             align-items: center;
             justify-content: center;
         }
+        #game-container.damage-flash {
+            animation: damageFlash 0.3s ease-out;
+        }
+        @keyframes damageFlash {
+            0%, 100% { background-color: var(--bg-color); }
+            50% { background-color: rgba(239, 68, 68, 0.5); }
+        }
         canvas {
             display: block;
             background: var(--bg-color);

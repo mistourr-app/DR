@@ -4,49 +4,50 @@ import { DIMS } from './config.js';
 import { dealDamageToPlayer } from './combat.js';
 import { play } from './animation.js';
 
-export function updateEnemyAI() {
-  const { player, rows } = getGameState().runState;
-  rows.forEach((row, y) => {
-    row.forEach(cell => {
-      if (cell.type === OBJECT_TYPES.ENEMY && cell.data) {
-        const enemy = cell.data;
-        if (y === player.pos.y) {
-          const distanceX = player.pos.x - enemy.originalPos.x;
-          const visionRange = enemy.visionRange;
+let cachedThreatMaps = null;
+let threatMapsDirty = true;
 
-          if (Math.abs(distanceX) <= visionRange) {
-            let isBlocked = false;
-            const direction = Math.sign(distanceX);
-            for (let i = 1; i < Math.abs(distanceX); i++) {
-              const checkX = enemy.originalPos.x + i * direction;
-              if (rows[y][checkX].type === OBJECT_TYPES.WALL) {
-                isBlocked = true;
-                break;
-              }
-            }
-            
-            if (!isBlocked) {
-              enemy.aiState = 'alert';
-            }
-          }
-        }
-      }
-    });
-  });
+export function markThreatMapsDirty() {
+  threatMapsDirty = true;
 }
 
 export function cleanupDeadEnemies(rows) {
+  let hasChanges = false;
+  
   for (const row of rows) {
     for (const cell of row) {
       if (cell.type === OBJECT_TYPES.ENEMY && cell.data && cell.data.currentHp <= 0) {
         cell.type = OBJECT_TYPES.EMPTY;
         cell.data = null;
+        hasChanges = true;
       }
     }
   }
+  
+  if (hasChanges) markThreatMapsDirty();
 }
 
-export function getThreatMaps(rows) {
+function canEnemySeePlayer(enemy, enemyX, enemyY, playerPos, rows) {
+  if (enemyY !== playerPos.y) return false;
+  
+  const distanceX = Math.abs(playerPos.x - enemyX);
+  if (distanceX > enemy.visionRange) return false;
+
+  const direction = Math.sign(playerPos.x - enemyX);
+  for (let i = 1; i < distanceX; i++) {
+    if (rows[enemyY][enemyX + i * direction].type === OBJECT_TYPES.WALL) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+export function getThreatMaps(rows, playerPos) {
+  if (!threatMapsDirty && cachedThreatMaps) {
+    return cachedThreatMaps;
+  }
+
   const idleThreatMap = new Set();
   const alertThreatMap = new Set();
 
@@ -56,7 +57,8 @@ export function getThreatMaps(rows) {
       if (cell.type !== OBJECT_TYPES.ENEMY || !cell.data) continue;
 
       const enemy = cell.data;
-      const targetMap = enemy.aiState === 'alert' ? alertThreatMap : idleThreatMap;
+      const isAlert = canEnemySeePlayer(enemy, x, y, playerPos, rows);
+      const targetMap = isAlert ? alertThreatMap : idleThreatMap;
 
       targetMap.add(`${x},${y}`);
 
@@ -75,7 +77,9 @@ export function getThreatMaps(rows) {
     }
   }
 
-  return { idleThreatMap, alertThreatMap };
+  cachedThreatMaps = { idleThreatMap, alertThreatMap };
+  threatMapsDirty = false;
+  return cachedThreatMaps;
 }
 
 export function processEnemyTurns(y, onAllAttacksComplete) {
@@ -85,9 +89,15 @@ export function processEnemyTurns(y, onAllAttacksComplete) {
     return;
   }
 
-  const attackingEnemies = rows[y].filter(cell => 
-    cell.type === OBJECT_TYPES.ENEMY && cell.data?.aiState === 'alert'
-  );
+  const attackingEnemies = [];
+  for (let x = 0; x < DIMS.COLS; x++) {
+    const cell = rows[y][x];
+    if (cell.type === OBJECT_TYPES.ENEMY && cell.data) {
+      if (canEnemySeePlayer(cell.data, x, y, player.pos, rows)) {
+        attackingEnemies.push(cell);
+      }
+    }
+  }
 
   if (attackingEnemies.length === 0) {
     onAllAttacksComplete();
@@ -109,7 +119,7 @@ export function processEnemyTurns(y, onAllAttacksComplete) {
       props: { 'visual.y': originalY + DIMS.CELL_SIZE * 0.3 },
       duration: 150,
       onComplete: () => {
-        const damageDealt = dealDamageToPlayer(enemy.currentHp, enemy);
+        dealDamageToPlayer(enemy.currentHp, enemy);
 
         play({
           target: enemyCell,

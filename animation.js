@@ -1,3 +1,5 @@
+import { getGameState } from './state.js';
+
 const animationQueue = [];
 
 // Простая функция линейной интерполяции (lerp)
@@ -45,6 +47,9 @@ export function play(animationConfig) {
  * @param {number} deltaTime - Время, прошедшее с прошлого кадра (в мс).
  */
 export function updateAnimations(deltaTime) {
+  // Обновляем всплывающие тексты всегда
+  updateFloatingTexts();
+  
   if (animationQueue.length === 0) return;
 
   const current = animationQueue[0];
@@ -75,4 +80,25 @@ export function updateAnimations(deltaTime) {
  */
 export function isAnimating() {
   return animationQueue.length > 0;
+}
+
+/**
+ * Обновляет всплывающие тексты (движение вверх и затухание).
+ */
+function updateFloatingTexts() {
+  const state = getGameState();
+  if (!state.runState?.floatingTexts) return;
+  
+  const { floatingTexts } = state.runState;
+  
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    
+    ft.visual.y += 0.5;
+    ft.visual.alpha -= 0.02;
+
+    if (ft.visual.alpha <= 0) {
+      floatingTexts.splice(i, 1);
+    }
+  }
 }

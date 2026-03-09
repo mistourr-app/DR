@@ -1,16 +1,9 @@
 import { getGameState } from './state.js';
 import { OBJECT_TYPES, CELL_DEFS } from './registry.js';
 import { DIMS } from './config.js';
-import { dealDamageToPlayer, dealDamageToBoss } from './combat.js';
+import { dealDamageToPlayer } from './combat.js';
 import { play } from './animation.js';
-import { generateNewArenaObject } from './run.js';
-
-function createPRNG(seed) {
-  return function() {
-    seed = (seed * 9301 + 49297) % 233280;
-    return seed / 233280;
-  };
-}
+import { createPRNG, generateArenaObject } from './utils.js';
 
 export function processBossTurn() {
   const { runState, runState: { player, boss, rows, seed } } = getGameState();
@@ -38,7 +31,7 @@ export function processBossTurn() {
 
     switch (aiProfile) {
       case 'aggressive':
-        if (targetCell.type === OBJECT_TYPES.ATTACK_CELL && player.pos.x === newX) score += 200;
+        if (targetCell.type === OBJECT_TYPES.ATTACK_CELL) score += 200;
         if (targetCell.type === OBJECT_TYPES.ATTACK_BONUS) score += 50;
         if (targetCell.type === OBJECT_TYPES.HEAL) score += 5;
         if (targetCell.type === OBJECT_TYPES.DEFENSE_BONUS) score += 1;
@@ -48,11 +41,11 @@ export function processBossTurn() {
         if (targetCell.type === OBJECT_TYPES.DEFENSE_BONUS) score += 100;
         if (player.pos.x === newX) score -= 50;
         if (targetCell.type === OBJECT_TYPES.ATTACK_BONUS) score += 10;
-        if (targetCell.type === OBJECT_TYPES.ATTACK_CELL && player.pos.x === newX) score += 5;
+        if (targetCell.type === OBJECT_TYPES.ATTACK_CELL) score += 5;
         break;
       case 'balanced':
       default:
-        if (targetCell.type === OBJECT_TYPES.ATTACK_CELL && player.pos.x === newX) score += 100;
+        if (targetCell.type === OBJECT_TYPES.ATTACK_CELL) score += 100;
         if (targetCell.type === OBJECT_TYPES.HEAL) score += 40;
         if (targetCell.type === OBJECT_TYPES.ATTACK_BONUS) score += 20;
         if (targetCell.type === OBJECT_TYPES.DEFENSE_BONUS) score += 20;
@@ -67,6 +60,12 @@ export function processBossTurn() {
     }
   }
 
+  // Разрыв циклов: избегаем возврата на предыдущую позицию
+  if (bestMoves.length > 1 && boss.lastMoveX != null) {
+    const filtered = bestMoves.filter(m => m !== boss.lastMoveX);
+    if (filtered.length > 0) bestMoves = filtered;
+  }
+
   let targetX;
   if (bestMoves.length > 0) {
     targetX = bestMoves[Math.floor(random() * bestMoves.length)];
@@ -74,6 +73,7 @@ export function processBossTurn() {
     const allPossibleMoves = Array.from({length: DIMS.COLS}, (_, i) => i).filter(i => i !== boss.pos.x);
     targetX = allPossibleMoves[Math.floor(random() * allPossibleMoves.length)];
   }
+
   console.log(`Boss AI profile: ${aiProfile}, chose move to ${targetX}`);
 
   const targetCell = rows[boss.pos.y][targetX];
@@ -85,22 +85,14 @@ export function processBossTurn() {
     duration: 200,
     onComplete: () => {
       boss.pos.x = targetX;
+      if (boss) boss.lastMoveX = targetX;
 
       const landedCellType = targetCell.type;
       const landedCellData = targetCell.data;
 
-      if (landedCellType === OBJECT_TYPES.ATTACK_BONUS) {
-        if (boss.inventory.attackBonuses.length < 2) {
-          boss.inventory.attackBonuses.push({ ...landedCellData });
-        }
-      } else if (landedCellType === OBJECT_TYPES.DEFENSE_BONUS) {
-        if (boss.inventory.defenseBonuses.length < 2) {
-          boss.inventory.defenseBonuses.push({ ...landedCellData });
-        }
-      }
-
-      const random = createPRNG(runState.seed + bossCell.visual.x * bossCell.visual.y + runState.boss.currentHp);
-      const { type: newType, data: newData } = generateNewArenaObject(bossCell.visual.x / DIMS.CELL_SIZE, boss.pos.y, runState.totalRows, random);
+      const random2 = createPRNG(runState.seed + bossCell.visual.x * bossCell.visual.y + runState.boss.currentHp);
+      const bossHpPercent = boss.currentHp / boss.hp;
+      const { type: newType, data: newData } = generateArenaObject(bossCell.visual.x / DIMS.CELL_SIZE, boss.pos.y, runState.totalRows, random2, bossHpPercent);
       bossCell.type = newType;
       bossCell.data = newData;
 
@@ -108,7 +100,35 @@ export function processBossTurn() {
       targetCell.data = boss;
       targetCell.visual.x = targetX * DIMS.CELL_SIZE;
 
-      if (landedCellType === OBJECT_TYPES.ATTACK_CELL && player.pos.x === targetX) {
+      if (landedCellType === OBJECT_TYPES.ATTACK_BONUS) {
+        if (boss.inventory.attackBonuses.length < 2) {
+          boss.inventory.attackBonuses.push({ ...landedCellData });
+        } else {
+          targetCell.isAnimating = true;
+          play({
+            target: targetCell,
+            props: { 'visual.alpha': 0 },
+            duration: 300,
+            onComplete: () => {}
+          });
+        }
+      } else if (landedCellType === OBJECT_TYPES.DEFENSE_BONUS) {
+        if (boss.inventory.defenseBonuses.length < 2) {
+          boss.inventory.defenseBonuses.push({ ...landedCellData });
+        } else {
+          targetCell.isAnimating = true;
+          play({
+            target: targetCell,
+            props: { 'visual.alpha': 0 },
+            duration: 300,
+            onComplete: () => {}
+          });
+        }
+      } else if (landedCellType === OBJECT_TYPES.HEAL) {
+        const healAmount = CELL_DEFS[OBJECT_TYPES.HEAL].amount;
+        const oldHp = boss.currentHp;
+        boss.currentHp = Math.min(boss.hp, oldHp + healAmount);
+      } else if (landedCellType === OBJECT_TYPES.ATTACK_CELL) {
         const cellDamage = landedCellData.value;
         const bonusDamage = boss.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
         const totalDamage = cellDamage + bonusDamage;
@@ -133,10 +153,11 @@ export function processBossTurn() {
             });
           }
         });
-      } else {
-        if (player.hp > 0) {
-          runState.turnOwner = 'player';
-        }
+        return;
+      }
+
+      if (player.hp > 0) {
+        runState.turnOwner = 'player';
       }
     }
   });

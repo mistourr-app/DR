@@ -1,6 +1,7 @@
 import { getGameState } from './state.js';
 import { DIMS } from './config.js';
 import { OBJECT_TYPES, CELL_DEFS } from './registry.js';
+import { getThreatMaps } from './enemyAI.js';
 
 let ctx;
 
@@ -37,38 +38,8 @@ export function renderRun() {
   const lastVisibleRow = Math.min(rows.length - 1, firstVisibleRow + DIMS.VISIBLE_ROWS + 3);
   const playerRow = player.pos.y;
 
-  // --- Карта угроз ---
-  // Собираем все клетки, которые находятся в поле зрения врагов
-  const idleThreatMap = new Set();
-  const alertThreatMap = new Set();
-
-  for (let y = 0; y < rows.length; y++) {
-    for (let x = 0; x < DIMS.COLS; x++) {
-      const cell = rows[y][x];
-      if (cell.type !== OBJECT_TYPES.ENEMY || !cell.data) continue;
-
-      const enemy = cell.data;
-      const targetMap = enemy.aiState === 'alert' ? alertThreatMap : idleThreatMap;
-
-      // Добавляем саму клетку врага в соответствующую карту угроз
-      targetMap.add(`${x},${y}`);
-
-      // Проверяем клетки слева от врага
-      for (let i = 1; i <= enemy.visionRange; i++) {
-        const checkX = x - i;
-        if (checkX < 0) break; // Вышли за пределы поля
-        if (rows[y][checkX].type === OBJECT_TYPES.WALL) break; // Стена блокирует обзор
-        targetMap.add(`${checkX},${y}`);
-      }
-      // Проверяем клетки справа от врага
-      for (let i = 1; i <= enemy.visionRange; i++) {
-        const checkX = x + i;
-        if (checkX >= DIMS.COLS) break; // Вышли за пределы поля
-        if (rows[y][checkX].type === OBJECT_TYPES.WALL) break; // Стена блокирует обзор
-        targetMap.add(`${checkX},${y}`);
-      }
-    }
-  }
+  // --- Карта угроз (кэшированная) ---
+  const { idleThreatMap, alertThreatMap } = getThreatMaps(rows, player.pos);
 
   // --- Новый двухпроходный рендер ---
   // Pass 1: Собираем информацию обо всех видимых клетках
@@ -223,18 +194,7 @@ function renderFloatingTexts(scrollY) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  for (let i = floatingTexts.length - 1; i >= 0; i--) {
-    const ft = floatingTexts[i];
-    
-    // Простое управление анимацией и временем жизни прямо в рендерере
-    ft.visual.y += 0.5; // Скорость подъема (увеличиваем Y в мировых координатах, чтобы двигаться вверх по экрану)
-    ft.visual.alpha -= 0.02; // Скорость исчезновения
-
-    if (ft.visual.alpha <= 0) {
-      floatingTexts.splice(i, 1); // Удаляем, когда текст стал невидимым
-      continue;
-    }
-
+  for (const ft of floatingTexts) {
     const drawX = ft.visual.x + DIMS.CELL_SIZE / 2;
     const drawY = ctx.canvas.height - (ft.visual.y - scrollY) - DIMS.CELL_SIZE / 2;
 
@@ -296,13 +256,12 @@ function renderTacticalElements(scrollY) {
     }
   }
   } else if (levelPhase === 'boss_arena') {
-    // Логика для арены босса
+    // Логика для арены босса - показываем пунктир всегда, когда есть заряды
     const playerX = player.pos.x;
     const bossX = boss.pos.x;
     const distance = Math.abs(bossX - playerX);
 
     if (distance > 0 && distance <= player.inventory.weapon.range) {
-      // На арене нет стен, поэтому проверка на LoS не нужна
       const bossCell = rows[boss.pos.y][boss.pos.x];
 
       ctx.save();
@@ -319,7 +278,7 @@ function renderTacticalElements(scrollY) {
       ctx.lineTo(endX, endY);
 
       ctx.lineWidth = 2;
-      ctx.strokeStyle = '#ffffff'; // Белый цвет
+      ctx.strokeStyle = player.hasShotOnCurrentRow ? '#6b7280' : '#ffffff'; // Серый если уже стрелял
       ctx.stroke();
       ctx.restore();
     }
