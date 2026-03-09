@@ -37,7 +37,7 @@ export const LEVELS = [
       [{type: 'attack_cell', data: {value: 5}}, {type: 'heal'}, {}, {type: 'heal'}, {type: 'attack_cell', data: {value: 5}}]
     ]
   },
-  { id: 'test_arena', rows: 6, name: "Тестовый полигон", bossHpMultiplier: 1.5, chances: { ENEMY: 0.1, WALL: 0.1, HEAL: 0.05, AMMO: 0.04, ENERGY: 0.04, ATTACK_BONUS: 0.03, DEFENSE_BONUS: 0.03 } },
+  { id: 'test_arena', rows: 6, name: "Тестовый полигон", bossHpMultiplier: 1.5, hidden: true, chances: { ENEMY: 0.1, WALL: 0.1, HEAL: 0.05, AMMO: 0.04, ENERGY: 0.04, ATTACK_BONUS: 0.03, DEFENSE_BONUS: 0.03 } },
   { id: 'sector_1', rows: 30, name: "Сектор 1", bossHpMultiplier: 2.5, chances: { ENEMY: 0.1, WALL: 0.1, HEAL: 0.05, AMMO: 0.04, ENERGY: 0.04, ATTACK_BONUS: 0.03, DEFENSE_BONUS: 0.03 } },
   { id: 'sector_2', rows: 50, name: "Сектор 2", bossHpMultiplier: 3.5, chances: { ENEMY: 0.15, WALL: 0.1, HEAL: 0.05, AMMO: 0.04, ENERGY: 0.04, ATTACK_BONUS: 0.03, DEFENSE_BONUS: 0.03 } },
   { id: 'core', rows: 75, name: "Ядро", bossHpMultiplier: 5.0, chances: { ENEMY: 0.2, WALL: 0.15, HEAL: 0.05, AMMO: 0.04, ENERGY: 0.04, ATTACK_BONUS: 0.03, DEFENSE_BONUS: 0.03 } }
