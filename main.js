@@ -91,13 +91,6 @@ function update(deltaTime) {
 
 function render() {
   ctx.clearRect(0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
-  
-  // ТЕСТ: красный квадрат
-  ctx.fillStyle = 'red';
-  ctx.fillRect(10, 10, 100, 100);
-  ctx.fillStyle = 'white';
-  ctx.font = '20px Arial';
-  ctx.fillText('TEST', 30, 60);
 
   const state = getGameState();
   switch (state.appState) {
