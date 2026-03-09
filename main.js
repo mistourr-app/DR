@@ -175,18 +175,13 @@ loadMetaState();
 setAppState(AppState.META_HUB, onStateChange);
 gameLoop();
 
-// --- РЕГИСТРАЦИЯ SERVICE WORKER ---
-// Этот код был в index.html, теперь его место здесь.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Регистрация относительно текущего местоположения HTML-файла.
-    // Так как sw.js в корне, можно просто указать его имя.
-    const swUrl = new URL('sw.js', window.location.href); 
-    navigator.serviceWorker.register(swUrl)
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
       .then(registration => {
-        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        console.log('ServiceWorker registered:', registration.scope);
       }).catch(err => {
-        console.error('ServiceWorker registration failed: ', err);
+        console.error('ServiceWorker registration failed:', err);
       });
   });
 }
