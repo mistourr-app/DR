@@ -162,11 +162,18 @@ gameLoop();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then(registration => {
-        console.log('ServiceWorker registered:', registration.scope);
-      }).catch(err => {
-        console.error('ServiceWorker registration failed:', err);
-      });
+    // Удаляем все Service Workers
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (let registration of registrations) {
+        registration.unregister();
+      }
+    });
+    
+    // Очищаем все кэши
+    caches.keys().then(names => {
+      for (let name of names) {
+        caches.delete(name);
+      }
+    });
   });
 }
