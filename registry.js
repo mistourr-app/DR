@@ -1,3 +1,6 @@
+// Версия данных - увеличивайте при изменении уровней, врагов или баланса
+export const DATA_VERSION = 1;
+
 // Временное хранилище данных об уровнях.
 // В будущем это будет загружаться из localStorage или сервера.
 export const LEVELS = [
@@ -190,15 +193,15 @@ export const LEVELS = [
     "id": "sector_2",
     "rows": 50,
     "name": "Сектор 2",
-    "bossHpMultiplier": 3.5,
+    "bossHpMultiplier": 1.5,
     "chances": {
       "ENEMY": 0.15,
-      "WALL": 0.1,
+      "WALL": 0.4,
       "HEAL": 0.05,
-      "AMMO": 0.04,
-      "ENERGY": 0.04,
-      "ATTACK_BONUS": 0.03,
-      "DEFENSE_BONUS": 0.03
+      "AMMO": 0.05,
+      "ENERGY": 0.05,
+      "ATTACK_BONUS": 0.05,
+      "DEFENSE_BONUS": 0.05
     }
   },
   {
