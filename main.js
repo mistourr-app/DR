@@ -4,6 +4,7 @@ import { showLevelSelectScreen, hideAllScreens, showGameOverScreen, showVictoryS
 import { startRun, processPlayerAction, initRun } from './run.js';
 import { initRenderer, renderRun } from './renderer.js';
 import { updateAnimations, isAnimating } from './animation.js';
+import { isClickAllowed } from './tutorial.js';
 
 const canvas = document.getElementById('gameCanvas');
 if (!canvas) {
@@ -137,6 +138,7 @@ function handleCanvasClick(event) {
     gy = arenaStartRow + Math.floor((worldY - dungeonHeight) / tallCellHeight);
   }
 
+  if (!isClickAllowed(gx, gy)) return;
   processPlayerAction(gx, gy);
 }
 

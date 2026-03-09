@@ -2,6 +2,7 @@ import { getGameState } from './state.js';
 import { DIMS } from './config.js';
 import { OBJECT_TYPES, CELL_DEFS } from './registry.js';
 import { getThreatMaps } from './enemyAI.js';
+import { getCurrentStep, getTutorialAllowedCells } from './tutorial.js';
 
 let ctx;
 
@@ -84,6 +85,9 @@ export function renderRun() {
   // Pass 3: Отрисовываем всплывающий текст поверх всего
   renderFloatingTexts(scrollY);
 
+  // Pass 4: Отрисовываем подсказки tutorial
+  renderTutorialHint();
+
   // Анимируемые (поверх всего)
   cellsToDraw
     .filter(c => c.cell.isAnimating)
@@ -129,6 +133,13 @@ function drawCard(x, y, cell, gx, gy, isVisible, isPassed, isInRange, idleThreat
   let strokeStyle = "#2d313d"; // --card-border (серый по умолчанию)
   let lineWidth = 1;
   ctx.setLineDash([]); // Сплошная линия по умолчанию
+
+  // Подсветка разрешенных клеток в tutorial
+  const tutorialCells = getTutorialAllowedCells();
+  if (tutorialCells && tutorialCells.some(c => c.x === gx && c.y === gy)) {
+    strokeStyle = "#22c55e"; // Ярко-зеленый
+    lineWidth = 3;
+  }
 
   const isDungeonMoveTarget = levelPhase === 'dungeon' && gy === player.pos.y + 1;
   // На арене подсвечиваем только горизонтальные ходы
@@ -301,11 +312,12 @@ function renderContent(cell, w, h) {
     }
     case OBJECT_TYPES.HEAL: {
       const def = CELL_DEFS[OBJECT_TYPES.HEAL];
+      const healValue = cell.data?.amount || def.amount;
       ctx.fillStyle = def.color;
       ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
       ctx.fillText(def.label, w / 2, 18 * fontScale);
       ctx.font = `900 ${Math.round(14 * fontScale)}px Inter, sans-serif`;
-      ctx.fillText(def.value, w / 2, h / 2 + (8 * fontScale));
+      ctx.fillText(`+${healValue}`, w / 2, h / 2 + (8 * fontScale));
       break;
     }
     case OBJECT_TYPES.AMMO: {
@@ -332,7 +344,7 @@ function renderContent(cell, w, h) {
       ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
       ctx.fillText(def.label, w / 2, 18 * fontScale);
       ctx.font = `900 ${Math.round(14 * fontScale)}px Inter, sans-serif`;
-      ctx.fillText(`+${cell.data.value}`, w / 2, h / 2 + (8 * fontScale));
+      ctx.fillText(`+${cell.data?.value || def.value}`, w / 2, h / 2 + (8 * fontScale));
       break;
     }
     case OBJECT_TYPES.DEFENSE_BONUS: {
@@ -341,7 +353,7 @@ function renderContent(cell, w, h) {
       ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
       ctx.fillText(def.label, w / 2, 18 * fontScale);
       ctx.font = `900 ${Math.round(14 * fontScale)}px Inter, sans-serif`;
-      ctx.fillText(`+${cell.data.value}`, w / 2, h / 2 + (8 * fontScale));
+      ctx.fillText(`+${cell.data?.value || def.value}`, w / 2, h / 2 + (8 * fontScale));
       break;
     }
     case OBJECT_TYPES.ATTACK_CELL: {
@@ -350,7 +362,7 @@ function renderContent(cell, w, h) {
       ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
       ctx.fillText(def.label, w / 2, 18 * fontScale);
       ctx.font = `900 ${Math.round(14 * fontScale)}px Inter, sans-serif`;
-      ctx.fillText(`${cell.data.value}`, w / 2, h / 2 + (8 * fontScale));
+      ctx.fillText(`${cell.data?.value || def.value}`, w / 2, h / 2 + (8 * fontScale));
       break;
     }
     case OBJECT_TYPES.ENEMY: {
@@ -420,5 +432,21 @@ function drawPlayerCard(x, y) {
   ctx.font = `bold ${Math.round(6 * fontScale)}px Inter, sans-serif`;
   ctx.fillText(`Э: ${player.energy}/${player.maxEnergy}`, w / 2, h - (6 * fontScale));
 
+  ctx.restore();
+}
+
+function renderTutorialHint() {
+  const step = getCurrentStep();
+  if (!step) return;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, ctx.canvas.width, 60);
+  
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 16px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(step.text, ctx.canvas.width / 2, 30);
   ctx.restore();
 }

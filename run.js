@@ -7,6 +7,7 @@ import { dealDamageToEnemy, dealDamageToBoss, processMeleeCombat, dealDamageToPl
 import { cleanupDeadEnemies, processEnemyTurns, markThreatMapsDirty } from './enemyAI.js';
 import { processBossTurn } from './bossAI.js';
 import { createPRNG, generateArenaObject } from './utils.js';
+import { startTutorial, stopTutorial, updateTutorial, isClickAllowed } from './tutorial.js';
 
 let _onStateChange = () => {};
 
@@ -41,7 +42,41 @@ export function startRun(levelId) {
   const random = createPRNG(seed);
 
   const initialRows = [];
-  const { ENEMY, WALL, HEAL, AMMO, ENERGY, ATTACK_BONUS, DEFENSE_BONUS } = levelData.chances;
+  
+  if (levelData.isTutorial && levelData.layout) {
+    // Фиксированный layout для tutorial
+    for (let y = 0; y < levelData.layout.length; y++) {
+      const row = [];
+      for (let x = 0; x < DIMS.COLS; x++) {
+        const cellDef = levelData.layout[y][x] || {};
+        let type = cellDef.type ? OBJECT_TYPES[cellDef.type.toUpperCase()] : OBJECT_TYPES.EMPTY;
+        let data = cellDef.data || null;
+        
+        if (type === OBJECT_TYPES.ENEMY) {
+          const enemyType = cellDef.enemyType || 'TYPE_1';
+          data = { 
+            ...ENEMY_DEFS[enemyType], 
+            currentHp: ENEMY_DEFS[enemyType].hp
+          };
+        } else if (type === OBJECT_TYPES.ATTACK_BONUS && !data) {
+          data = { value: CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].value };
+        } else if (type === OBJECT_TYPES.DEFENSE_BONUS && !data) {
+          data = { value: CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].value };
+        }
+        
+        row.push({ 
+          type, 
+          data,
+          visual: { x: x * DIMS.CELL_SIZE, y: getRowY(y, levelData.rows), alpha: 1.0 },
+          isAnimating: false
+        });
+      }
+      initialRows.push(row);
+    }
+    startTutorial();
+  } else {
+    // Процедурная генерация
+    const { ENEMY, WALL, HEAL, AMMO, ENERGY, ATTACK_BONUS, DEFENSE_BONUS } = levelData.chances;
 
   for (let y = 0; y < levelData.rows; y++) {
     const row = [];
@@ -86,6 +121,7 @@ export function startRun(levelId) {
       });
     }
     initialRows.push(row);
+  }
   }
 
   const bossHpMultiplier = levelData.bossHpMultiplier || 2.5;
@@ -157,6 +193,8 @@ export function processPlayerAction(gx, gy) {
   const { player, rows } = runState;
 
   if (runState.turnOwner !== 'player') return;
+  
+  if (!isClickAllowed(gx, gy)) return;
 
   if (runState.levelPhase === 'dungeon') {
     const targetCellForShot = rows[gy]?.[gx];
@@ -257,7 +295,7 @@ function processPlayerMove(targetX, targetY) {
 
       switch (targetCell.type) {
         case OBJECT_TYPES.HEAL: {
-          const healAmount = CELL_DEFS[OBJECT_TYPES.HEAL].amount;
+          const healAmount = targetCell.data?.amount || CELL_DEFS[OBJECT_TYPES.HEAL].amount;
           const oldHp = player.hp;
           player.hp = Math.min(player.maxHp, oldHp + healAmount);
           const actualHealed = player.hp - oldHp;
@@ -430,6 +468,8 @@ function processPlayerMove(targetX, targetY) {
       if (targetCell.type !== OBJECT_TYPES.ENEMY && runState.levelPhase === 'dungeon') {
         runState.turnOwner = 'player';
       }
+      
+      updateTutorial();
     }
   });
 }
@@ -440,6 +480,8 @@ function processPlayerShot(targetCell) {
 
   player.hasShotOnCurrentRow = true;
   player.inventory.ammo--;
+
+  console.log('[TUTORIAL] Player shot, ammo:', player.inventory.ammo);
 
   const enemy = targetCell.data;
   const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
@@ -471,10 +513,12 @@ function processPlayerShot(targetCell) {
               onComplete: () => {
                 targetCell.type = OBJECT_TYPES.EMPTY;
                 targetCell.data = null;
+                updateTutorial();
               }
             });
           } else {
             runState.turnOwner = 'player';
+            updateTutorial();
           }
         }
       });

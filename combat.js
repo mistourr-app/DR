@@ -1,6 +1,7 @@
 import { getGameState, setAppState } from './state.js';
 import { AppState } from './config.js';
 import { Events, emit } from './events.js';
+import { stopTutorial } from './tutorial.js';
 
 let _onStateChange = () => {};
 
@@ -53,6 +54,7 @@ export function dealDamageToPlayer(incomingDamage, source = null) {
 
   if (player.hp <= 0) {
     emit(Events.RUN_ENDED, { result: 'defeat' });
+    stopTutorial();
     setTimeout(() => setAppState(AppState.RUN_SUMMARY, _onStateChange), 100);
   }
 
@@ -114,6 +116,7 @@ export function dealDamageToBoss(damage) {
   if (boss.currentHp <= 0) {
     runState.turnOwner = 'processing';
     emit(Events.BOSS_KILLED, { boss });
+    stopTutorial();
     setAppState(AppState.RUN_VICTORY, _onStateChange);
   }
 

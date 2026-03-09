@@ -129,7 +129,7 @@ export function processBossTurn() {
         const oldHp = boss.currentHp;
         boss.currentHp = Math.min(boss.hp, oldHp + healAmount);
       } else if (landedCellType === OBJECT_TYPES.ATTACK_CELL) {
-        const cellDamage = landedCellData.value;
+        const cellDamage = landedCellData?.value || CELL_DEFS[OBJECT_TYPES.ATTACK_CELL].value;
         const bonusDamage = boss.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
         const totalDamage = cellDamage + bonusDamage;
         boss.inventory.attackBonuses = [];
