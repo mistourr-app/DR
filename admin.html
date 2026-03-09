@@ -244,34 +244,37 @@
           <div class="border-t border-gray-700 pt-4">
             <h3 class="font-bold mb-2">Шансы спавна объектов</h3>
             ${selectedLevel.chances ? `
+              <div class="mb-3 p-2 bg-gray-900 rounded">
+                <div class="text-sm font-bold text-green-400">Пустые клетки: <span id="empty-percent">0</span>%</div>
+              </div>
               <div class="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <label class="block text-xs text-gray-400">Враги</label>
-                  <input id="edit-enemy" type="number" step="0.01" value="${selectedLevel.chances.ENEMY}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                  <label class="block text-xs text-gray-400">Враги (%)</label>
+                  <input id="edit-enemy" type="number" step="1" value="${selectedLevel.chances.ENEMY * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Стены</label>
-                  <input id="edit-wall" type="number" step="0.01" value="${selectedLevel.chances.WALL}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                  <label class="block text-xs text-gray-400">Стены (%)</label>
+                  <input id="edit-wall" type="number" step="1" value="${selectedLevel.chances.WALL * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Здоровье</label>
-                  <input id="edit-heal" type="number" step="0.01" value="${selectedLevel.chances.HEAL}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                  <label class="block text-xs text-gray-400">Здоровье (%)</label>
+                  <input id="edit-heal" type="number" step="1" value="${selectedLevel.chances.HEAL * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Патроны</label>
-                  <input id="edit-ammo" type="number" step="0.01" value="${selectedLevel.chances.AMMO}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                  <label class="block text-xs text-gray-400">Патроны (%)</label>
+                  <input id="edit-ammo" type="number" step="1" value="${selectedLevel.chances.AMMO * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Энергия</label>
-                  <input id="edit-energy" type="number" step="0.01" value="${selectedLevel.chances.ENERGY}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                  <label class="block text-xs text-gray-400">Энергия (%)</label>
+                  <input id="edit-energy" type="number" step="1" value="${selectedLevel.chances.ENERGY * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Бонус атаки</label>
-                  <input id="edit-attack-bonus" type="number" step="0.01" value="${selectedLevel.chances.ATTACK_BONUS}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                  <label class="block text-xs text-gray-400">Бонус атаки (%)</label>
+                  <input id="edit-attack-bonus" type="number" step="1" value="${selectedLevel.chances.ATTACK_BONUS * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Бонус защиты</label>
-                  <input id="edit-defense-bonus" type="number" step="0.01" value="${selectedLevel.chances.DEFENSE_BONUS}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                  <label class="block text-xs text-gray-400">Бонус защиты (%)</label>
+                  <input id="edit-defense-bonus" type="number" step="1" value="${selectedLevel.chances.DEFENSE_BONUS * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
               </div>
             ` : '<p class="text-gray-400 text-sm">Это туториал с фиксированным layout</p>'}
@@ -286,6 +289,28 @@
 
       document.getElementById('save-btn').addEventListener('click', saveLevel);
       document.getElementById('export-btn').addEventListener('click', exportLevel);
+      
+      if (selectedLevel.chances) {
+        updateEmptyPercent();
+        document.querySelectorAll('.chance-input').forEach(input => {
+          input.addEventListener('input', updateEmptyPercent);
+        });
+      }
+    }
+
+    function updateEmptyPercent() {
+      const total = 
+        parseFloat(document.getElementById('edit-enemy').value || 0) +
+        parseFloat(document.getElementById('edit-wall').value || 0) +
+        parseFloat(document.getElementById('edit-heal').value || 0) +
+        parseFloat(document.getElementById('edit-ammo').value || 0) +
+        parseFloat(document.getElementById('edit-energy').value || 0) +
+        parseFloat(document.getElementById('edit-attack-bonus').value || 0) +
+        parseFloat(document.getElementById('edit-defense-bonus').value || 0);
+      
+      const empty = Math.max(0, 100 - total);
+      document.getElementById('empty-percent').textContent = empty.toFixed(0);
+      document.getElementById('empty-percent').style.color = empty < 0 ? '#ef4444' : '#10b981';
     }
 
     function saveLevel() {
@@ -297,13 +322,13 @@
         rows: parseInt(document.getElementById('edit-rows').value),
         bossHpMultiplier: parseFloat(document.getElementById('edit-boss-hp').value),
         chances: selectedLevel.chances ? {
-          ENEMY: parseFloat(document.getElementById('edit-enemy').value),
-          WALL: parseFloat(document.getElementById('edit-wall').value),
-          HEAL: parseFloat(document.getElementById('edit-heal').value),
-          AMMO: parseFloat(document.getElementById('edit-ammo').value),
-          ENERGY: parseFloat(document.getElementById('edit-energy').value),
-          ATTACK_BONUS: parseFloat(document.getElementById('edit-attack-bonus').value),
-          DEFENSE_BONUS: parseFloat(document.getElementById('edit-defense-bonus').value)
+          ENEMY: parseFloat(document.getElementById('edit-enemy').value) / 100,
+          WALL: parseFloat(document.getElementById('edit-wall').value) / 100,
+          HEAL: parseFloat(document.getElementById('edit-heal').value) / 100,
+          AMMO: parseFloat(document.getElementById('edit-ammo').value) / 100,
+          ENERGY: parseFloat(document.getElementById('edit-energy').value) / 100,
+          ATTACK_BONUS: parseFloat(document.getElementById('edit-attack-bonus').value) / 100,
+          DEFENSE_BONUS: parseFloat(document.getElementById('edit-defense-bonus').value) / 100
         } : undefined
       };
 
