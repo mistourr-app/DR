@@ -25,6 +25,9 @@ export function initRun(callback) {
 }
 
 export function startRun(levelId) {
+  // Останавливаем туториал перед стартом любого уровня
+  stopTutorial();
+  
   clearEvents();
   markThreatMapsDirty();
   emit(Events.RUN_STARTED, { levelId });

@@ -4,7 +4,7 @@ import { showLevelSelectScreen, hideAllScreens, showGameOverScreen, showVictoryS
 import { startRun, processPlayerAction, initRun } from './run.js';
 import { initRenderer, renderRun } from './renderer.js';
 import { updateAnimations, isAnimating } from './animation.js';
-import { isClickAllowed } from './tutorial.js';
+import { isClickAllowed, stopTutorial } from './tutorial.js';
 
 const canvas = document.getElementById('gameCanvas');
 if (!canvas) {
@@ -57,6 +57,7 @@ function onStateChange(newState, oldState) {
           }
         },
         () => { // onGoToMenu
+          stopTutorial();
           const url = new URL(window.location);
           url.searchParams.delete('seed');
           window.history.pushState({}, '', url);
@@ -67,6 +68,7 @@ function onStateChange(newState, oldState) {
     }
     case AppState.RUN_VICTORY: {
       showVictoryScreen(() => { // onGoToMenu
+        stopTutorial();
         const url = new URL(window.location);
         url.searchParams.delete('seed');
         window.history.pushState({}, '', url);
@@ -97,6 +99,8 @@ function render() {
   switch (state.appState) {
     case AppState.RUN_PLAYING:
       renderTopBar(state.runState, () => {
+        // Останавливаем туториал при выходе в меню
+        stopTutorial();
         const url = new URL(window.location);
         url.searchParams.delete('seed');
         window.history.pushState({}, '', url);

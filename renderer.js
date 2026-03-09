@@ -186,9 +186,11 @@ function drawCard(x, y, cell, gx, gy, isVisible, isPassed, isInRange, idleThreat
   ctx.stroke();
 
   // Отрисовка содержимого, если клетка не пустая
-  if (cell.type !== OBJECT_TYPES.EMPTY && isVisible && isInRange) {
+  // Босс всегда видим в арене, независимо от isInRange
+  const isBossCell = cell.type === OBJECT_TYPES.BOSS;
+  if (cell.type !== OBJECT_TYPES.EMPTY && (isVisible || isBossCell) && (isInRange || isBossCell)) {
     renderContent(cell, w, h);
-  } else if (!isPassed && (!isVisible || !isInRange) && !cell.isAnimating) {
+  } else if (!isPassed && (!isVisible || !isInRange) && !cell.isAnimating && !isBossCell) {
     // Вместо "?" рисуем простую тень для скрытых клеток
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fill();

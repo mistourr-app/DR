@@ -229,7 +229,7 @@
     <div id="version">v19</div>
 
     <div id="level-select-screen" class="overlay" style="display: none;">
-        <h2>ВЫБОР УРОВНЯ</h2>
+        <h2 id="level-select-title" style="cursor: pointer; user-select: none;">ВЫБОР УРОВНЯ</h2>
         <p class="text-slate-500 mb-4">Выберите сектор для развертывания</p>
         <div id="level-buttons-container"></div>
     </div>
@@ -285,5 +285,30 @@
     </div>
 
     <script type="module" src="main.js?v=19"></script>
+    <script>
+      // Скрытый вход в админку: 5 кликов по заголовку
+      let clickCount = 0;
+      let clickTimer = null;
+      
+      document.addEventListener('DOMContentLoaded', () => {
+        const title = document.getElementById('level-select-title');
+        if (title) {
+          title.addEventListener('click', () => {
+            clickCount++;
+            
+            // Сбрасываем счетчик через 1 секунду
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => {
+              clickCount = 0;
+            }, 1000);
+            
+            // При 5 кликах открываем админку
+            if (clickCount === 5) {
+              window.location.href = 'admin.html';
+            }
+          });
+        }
+      });
+    </script>
 </body>
 </html>

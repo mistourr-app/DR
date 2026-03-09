@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Админка - Управление уровнями</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .dragging { opacity: 0.5; }
+    .drag-over { border-top: 3px solid #3b82f6; }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+  <div class="container mx-auto p-4 max-w-6xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">🎮 Админка уровней</h1>
+      <a href="index.html" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">← Вернуться к игре</a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-gray-800 rounded-lg p-6">
+        <h2 class="text-xl font-bold mb-4">📋 Существующие уровни (снизу вверх)</h2>
+        <div id="levels-list" class="space-y-2"></div>
+        <button id="add-level-btn" class="mt-4 w-full px-4 py-2 bg-green-600 hover:bg-green-700 rounded">
+          ➕ Создать новый уровень
+        </button>
+      </div>
+
+      <div class="bg-gray-800 rounded-lg p-6">
+        <h2 class="text-xl font-bold mb-4">✏️ Редактор уровня</h2>
+        <div id="editor-content">
+          <p class="text-gray-400">Выберите уровень для редактирования</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-xl font-bold mb-4">Создать новый уровень</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">ID уровня</label>
+            <input id="new-level-id" type="text" class="w-full px-3 py-2 bg-gray-700 rounded" placeholder="sector_3">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Название</label>
+            <input id="new-level-name" type="text" class="w-full px-3 py-2 bg-gray-700 rounded" placeholder="Сектор 3">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Количество рядов</label>
+            <input id="new-level-rows" type="number" class="w-full px-3 py-2 bg-gray-700 rounded" value="30" min="6">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Множитель HP босса</label>
+            <input id="new-level-boss-hp" type="number" step="0.1" class="w-full px-3 py-2 bg-gray-700 rounded" value="2.5" min="1">
+          </div>
+          <div class="flex gap-2">
+            <button id="create-level-btn" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded">Создать</button>
+            <button id="cancel-create-btn" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded">Отмена</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { LEVELS } from './registry.js';
+
+    let currentLevels = [...LEVELS];
+    let selectedLevel = null;
+    let draggedIndex = null;
+
+    function loadLevelOrder() {
+      const order = localStorage.getItem('levelOrder');
+      if (order) {
+        const ids = JSON.parse(order);
+        const ordered = [];
+        ids.forEach(id => {
+          const level = currentLevels.find(l => l.id === id);
+          if (level) ordered.push(level);
+        });
+        currentLevels.forEach(l => {
+          if (!ordered.find(ol => ol.id === l.id)) ordered.push(l);
+        });
+        currentLevels = ordered;
+      }
+    }
+
+    function saveLevelOrder() {
+      localStorage.setItem('levelOrder', JSON.stringify(currentLevels.map(l => l.id)));
+    }
+
+    function renderLevelsList() {
+      const list = document.getElementById('levels-list');
+      const reversed = [...currentLevels].reverse();
+      list.innerHTML = reversed.map((level, revIndex) => {
+        const index = currentLevels.length - 1 - revIndex;
+        return `
+        <div class="level-item flex items-center justify-between p-3 bg-gray-700 rounded hover:bg-gray-600 ${level.isTutorial ? '' : 'cursor-move'}" 
+             data-index="${index}" 
+             draggable="${!level.isTutorial}">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">${level.isTutorial ? '🔒' : '☰'}</span>
+            <div>
+              <div class="font-bold ${level.hidden ? 'text-gray-400 line-through' : ''}">${level.name}${level.isTutorial ? ' (защищен)' : ''}</div>
+              <div class="text-sm text-gray-400">${level.rows} рядов • Boss HP x${level.bossHpMultiplier} ${level.hidden ? '• Скрыт' : ''}</div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="play-btn px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm" data-index="${index}">▶️</button>
+            <button class="toggle-visibility-btn px-3 py-1 ${level.isTutorial ? 'bg-gray-600 cursor-not-allowed opacity-50' : (level.hidden ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700')} rounded text-sm" data-index="${index}" ${level.isTutorial ? 'disabled' : ''}>
+              ${level.hidden ? '🙈' : '👁️'}
+            </button>
+            <button class="edit-btn px-3 py-1 ${level.isTutorial ? 'bg-gray-600 cursor-not-allowed opacity-50' : 'bg-blue-600 hover:bg-blue-700'} rounded text-sm" data-index="${index}" ${level.isTutorial ? 'disabled' : ''}>✏️</button>
+            <button class="delete-btn px-3 py-1 ${level.isTutorial ? 'bg-gray-600 cursor-not-allowed opacity-50' : 'bg-red-600 hover:bg-red-700'} rounded text-sm" data-index="${index}" ${level.isTutorial ? 'disabled' : ''}>🗑️</button>
+          </div>
+        </div>
+      `}).join('');
+
+      document.querySelectorAll('.level-item').forEach(item => {
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+      });
+
+      document.querySelectorAll('.play-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const index = parseInt(btn.dataset.index);
+          window.location.href = `index.html?level=${currentLevels[index].id}`;
+        });
+      });
+
+      document.querySelectorAll('.toggle-visibility-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const index = parseInt(btn.dataset.index);
+          if (currentLevels[index].isTutorial) {
+            alert('🔒 Туториал нельзя скрыть');
+            return;
+          }
+          toggleVisibility(index);
+        });
+      });
+
+      document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const index = parseInt(btn.dataset.index);
+          if (currentLevels[index].isTutorial) {
+            alert('🔒 Туториал защищен от редактирования');
+            return;
+          }
+          editLevel(index);
+        });
+      });
+
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const index = parseInt(btn.dataset.index);
+          if (currentLevels[index].isTutorial) {
+            alert('🔒 Туториал защищен от удаления');
+            return;
+          }
+          deleteLevel(index);
+        });
+      });
+    }
+
+    function handleDragStart(e) {
+      const index = parseInt(e.currentTarget.dataset.index);
+      if (currentLevels[index].isTutorial) {
+        e.preventDefault();
+        return;
+      }
+      draggedIndex = index;
+      e.currentTarget.classList.add('dragging');
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const targetIndex = parseInt(target.dataset.index);
+      if (currentLevels[targetIndex].isTutorial) return;
+      target.classList.add('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      const targetIndex = parseInt(e.currentTarget.dataset.index);
+      if (currentLevels[targetIndex].isTutorial || draggedIndex === null) return;
+      
+      const [removed] = currentLevels.splice(draggedIndex, 1);
+      currentLevels.splice(targetIndex, 0, removed);
+      saveLevelOrder();
+      renderLevelsList();
+    }
+
+    function handleDragEnd(e) {
+      e.currentTarget.classList.remove('dragging');
+      document.querySelectorAll('.level-item').forEach(item => {
+        item.classList.remove('drag-over');
+      });
+      draggedIndex = null;
+    }
+
+    function editLevel(index) {
+      selectedLevel = currentLevels[index];
+      const editor = document.getElementById('editor-content');
+      
+      editor.innerHTML = `
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">ID</label>
+            <input id="edit-id" type="text" value="${selectedLevel.id}" class="w-full px-3 py-2 bg-gray-700 rounded" readonly>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Название</label>
+            <input id="edit-name" type="text" value="${selectedLevel.name}" class="w-full px-3 py-2 bg-gray-700 rounded">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Количество рядов</label>
+            <input id="edit-rows" type="number" value="${selectedLevel.rows}" class="w-full px-3 py-2 bg-gray-700 rounded" min="6">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Множитель HP босса</label>
+            <input id="edit-boss-hp" type="number" step="0.1" value="${selectedLevel.bossHpMultiplier}" class="w-full px-3 py-2 bg-gray-700 rounded" min="1">
+          </div>
+          
+          <div class="border-t border-gray-700 pt-4">
+            <h3 class="font-bold mb-2">Шансы спавна объектов</h3>
+            ${selectedLevel.chances ? `
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <label class="block text-xs text-gray-400">Враги</label>
+                  <input id="edit-enemy" type="number" step="0.01" value="${selectedLevel.chances.ENEMY}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400">Стены</label>
+                  <input id="edit-wall" type="number" step="0.01" value="${selectedLevel.chances.WALL}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400">Здоровье</label>
+                  <input id="edit-heal" type="number" step="0.01" value="${selectedLevel.chances.HEAL}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400">Патроны</label>
+                  <input id="edit-ammo" type="number" step="0.01" value="${selectedLevel.chances.AMMO}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400">Энергия</label>
+                  <input id="edit-energy" type="number" step="0.01" value="${selectedLevel.chances.ENERGY}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400">Бонус атаки</label>
+                  <input id="edit-attack-bonus" type="number" step="0.01" value="${selectedLevel.chances.ATTACK_BONUS}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400">Бонус защиты</label>
+                  <input id="edit-defense-bonus" type="number" step="0.01" value="${selectedLevel.chances.DEFENSE_BONUS}" class="w-full px-2 py-1 bg-gray-700 rounded">
+                </div>
+              </div>
+            ` : '<p class="text-gray-400 text-sm">Это туториал с фиксированным layout</p>'}
+          </div>
+
+          <div class="flex gap-2 pt-4">
+            <button id="save-btn" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded">💾 Сохранить</button>
+            <button id="export-btn" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">📥 Экспорт</button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('save-btn').addEventListener('click', saveLevel);
+      document.getElementById('export-btn').addEventListener('click', exportLevel);
+    }
+
+    function saveLevel() {
+      const index = currentLevels.findIndex(l => l.id === selectedLevel.id);
+      
+      currentLevels[index] = {
+        ...selectedLevel,
+        name: document.getElementById('edit-name').value,
+        rows: parseInt(document.getElementById('edit-rows').value),
+        bossHpMultiplier: parseFloat(document.getElementById('edit-boss-hp').value),
+        chances: selectedLevel.chances ? {
+          ENEMY: parseFloat(document.getElementById('edit-enemy').value),
+          WALL: parseFloat(document.getElementById('edit-wall').value),
+          HEAL: parseFloat(document.getElementById('edit-heal').value),
+          AMMO: parseFloat(document.getElementById('edit-ammo').value),
+          ENERGY: parseFloat(document.getElementById('edit-energy').value),
+          ATTACK_BONUS: parseFloat(document.getElementById('edit-attack-bonus').value),
+          DEFENSE_BONUS: parseFloat(document.getElementById('edit-defense-bonus').value)
+        } : undefined
+      };
+
+      alert('✅ Уровень сохранен! Скопируйте код через "Экспорт" и обновите registry.js');
+      renderLevelsList();
+    }
+
+    function exportLevel() {
+      const code = `export const LEVELS = ${JSON.stringify(currentLevels, null, 2)};`;
+      
+      navigator.clipboard.writeText(code).then(() => {
+        alert('📋 Код скопирован в буфер обмена! Вставьте его в registry.js');
+      }).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('📋 Код скопирован! Вставьте его в registry.js');
+      });
+    }
+
+    function deleteLevel(index) {
+      if (confirm(`Удалить уровень "${currentLevels[index].name}"?`)) {
+        currentLevels.splice(index, 1);
+        saveLevelOrder();
+        renderLevelsList();
+        document.getElementById('editor-content').innerHTML = '<p class="text-gray-400">Выберите уровень для редактирования</p>';
+      }
+    }
+
+    function toggleVisibility(index) {
+      currentLevels[index].hidden = !currentLevels[index].hidden;
+      renderLevelsList();
+    }
+
+    document.getElementById('add-level-btn').addEventListener('click', () => {
+      document.getElementById('create-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('cancel-create-btn').addEventListener('click', () => {
+      document.getElementById('create-modal').classList.add('hidden');
+    });
+
+    document.getElementById('create-level-btn').addEventListener('click', () => {
+      const newLevel = {
+        id: document.getElementById('new-level-id').value,
+        rows: parseInt(document.getElementById('new-level-rows').value),
+        name: document.getElementById('new-level-name').value,
+        bossHpMultiplier: parseFloat(document.getElementById('new-level-boss-hp').value),
+        chances: {
+          ENEMY: 0.1,
+          WALL: 0.1,
+          HEAL: 0.05,
+          AMMO: 0.04,
+          ENERGY: 0.04,
+          ATTACK_BONUS: 0.03,
+          DEFENSE_BONUS: 0.03
+        }
+      };
+
+      currentLevels.push(newLevel);
+      saveLevelOrder();
+      renderLevelsList();
+      document.getElementById('create-modal').classList.add('hidden');
+      
+      document.getElementById('new-level-id').value = '';
+      document.getElementById('new-level-name').value = '';
+      document.getElementById('new-level-rows').value = '30';
+      document.getElementById('new-level-boss-hp').value = '2.5';
+    });
+
+    loadLevelOrder();
+    renderLevelsList();
+  </script>
+</body>
+</html>

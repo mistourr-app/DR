@@ -35,9 +35,26 @@ export function showLevelSelectScreen(onLevelSelect) {
     const container = document.getElementById('level-buttons-container');
     if (!container) return;
 
+    // Загружаем порядок уровней из localStorage
+    let orderedLevels = [...LEVELS];
+    const order = localStorage.getItem('levelOrder');
+    if (order) {
+      const ids = JSON.parse(order);
+      const ordered = [];
+      ids.forEach(id => {
+        const level = LEVELS.find(l => l.id === id);
+        if (level) ordered.push(level);
+      });
+      LEVELS.forEach(l => {
+        if (!ordered.find(ol => ol.id === l.id)) ordered.push(l);
+      });
+      orderedLevels = ordered;
+    }
+
     // Если кнопки еще не созданы, создаем их
     if (!container.children.length) {
-        LEVELS.forEach(level => {
+        // Фильтруем скрытые уровни и отображаем снизу вверх
+        orderedLevels.filter(level => !level.hidden).reverse().forEach(level => {
             const button = document.createElement('button');
             button.id = `level-btn-${level.id}`;
             button.innerText = `${level.name} (${level.rows} рядов)`;
@@ -47,7 +64,8 @@ export function showLevelSelectScreen(onLevelSelect) {
     }
 
     // Всегда обновляем обработчики событий, чтобы избежать "мертвых" колбэков
-    LEVELS.forEach(level => {
+    // Фильтруем скрытые уровни
+    orderedLevels.filter(level => !level.hidden).forEach(level => {
         const button = document.getElementById(`level-btn-${level.id}`);
         if (!button) return;
 
