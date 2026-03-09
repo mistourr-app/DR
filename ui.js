@@ -51,6 +51,15 @@ export function showLevelSelectScreen(onLevelSelect) {
       orderedLevels = ordered;
     }
 
+    // Загружаем видимость уровней из localStorage
+    const visibility = localStorage.getItem('levelVisibility');
+    if (visibility) {
+      const hidden = JSON.parse(visibility);
+      orderedLevels.forEach(l => {
+        l.hidden = hidden[l.id] || false;
+      });
+    }
+
     // Пересоздаем кнопки каждый раз для обновления порядка
     container.innerHTML = '';
     // Фильтруем скрытые уровни, переворачиваем массив и снова переворачиваем при добавлении

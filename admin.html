@@ -84,10 +84,22 @@
         });
         currentLevels = ordered;
       }
+      
+      const visibility = localStorage.getItem('levelVisibility');
+      if (visibility) {
+        const hidden = JSON.parse(visibility);
+        currentLevels.forEach(l => {
+          if (hidden[l.id]) l.hidden = true;
+        });
+      }
     }
 
     function saveLevelOrder() {
       localStorage.setItem('levelOrder', JSON.stringify(currentLevels.map(l => l.id)));
+      localStorage.setItem('levelVisibility', JSON.stringify(currentLevels.reduce((acc, l) => {
+        if (l.hidden) acc[l.id] = true;
+        return acc;
+      }, {})));
     }
 
     function renderLevelsList() {
@@ -326,6 +338,7 @@
 
     function toggleVisibility(index) {
       currentLevels[index].hidden = !currentLevels[index].hidden;
+      saveLevelOrder();
       renderLevelsList();
     }
 
