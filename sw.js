@@ -1,13 +1,23 @@
 const CACHE_NAME = 'dungeon-crawler-v2';
 // Список файлов, которые нужно закэшировать. 
 // Обязательно добавьте сюда ваши иконки!
-const FILES_TO_CACHE = [
+const RELATIVE_FILES_TO_CACHE = [
   '.', // Используем относительный путь для стартовой страницы
   'index.html',
   'manifest.json',
   'icon-192.png',
-  'icon-512.png'
+  'icon-512.png',
+  'main.js',
+  'state.js',
+  'config.js',
+  'ui.js',
+  'registry.js',
+  'run.js',
+  'renderer.js',
+  'animation.js'
 ];
+// Преобразуем относительные пути в абсолютные URL, чтобы избежать проблем с сопоставлением
+const FILES_TO_CACHE = RELATIVE_FILES_TO_CACHE.map(p => new URL(p, self.location).href);
 
 // При установке Service Worker'а кэшируем файлы
 self.addEventListener('install', (evt) => {
@@ -44,9 +54,27 @@ self.addEventListener('fetch', (evt) => {
   if (evt.request.url.includes('cdn.tailwindcss.com')) {
     return;
   }
+
+  // Стратегия "Cache, then network"
   evt.respondWith(
-    caches.match(evt.request).then((response) => {
-      return response || fetch(evt.request);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Сначала пытаемся получить ответ из кэша
+      const cachedResponse = await cache.match(evt.request);
+      
+      // В фоне делаем запрос к сети
+      const fetchedResponsePromise = fetch(evt.request).then((networkResponse) => {
+        // Если запрос успешен, обновляем кэш
+        if (networkResponse.ok) {
+          cache.put(evt.request, networkResponse.clone());
+        }
+        return networkResponse;
+      }).catch(() => {
+        // Если сеть недоступна, ничего страшного, у нас есть кэш
+      });
+
+      // Возвращаем ответ из кэша, если он есть,
+      // или ждем ответа от сети, если в кэше ничего не нашлось.
+      return cachedResponse || fetchedResponsePromise;
     })
   );
 });
