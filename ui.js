@@ -51,29 +51,17 @@ export function showLevelSelectScreen(onLevelSelect) {
       orderedLevels = ordered;
     }
 
-    // Если кнопки еще не созданы, создаем их
-    if (!container.children.length) {
-        // Фильтруем скрытые уровни и отображаем снизу вверх
-        orderedLevels.filter(level => !level.hidden).reverse().forEach(level => {
-            const button = document.createElement('button');
-            button.id = `level-btn-${level.id}`;
-            button.innerText = `${level.name} (${level.rows} рядов)`;
-            button.className = 'button';
-            container.appendChild(button);
-        });
-    }
-
-    // Всегда обновляем обработчики событий, чтобы избежать "мертвых" колбэков
-    // Фильтруем скрытые уровни
-    orderedLevels.filter(level => !level.hidden).forEach(level => {
-        const button = document.getElementById(`level-btn-${level.id}`);
-        if (!button) return;
-
-        // Заменяем кнопку на ее клон, чтобы удалить ВСЕ предыдущие обработчики событий.
-        const newButton = button.cloneNode(true);
-        button.parentNode.replaceChild(newButton, button);
-        // Добавляем единственный актуальный обработчик на новую кнопку.
-        newButton.addEventListener('click', () => onLevelSelect(level.id));
+    // Пересоздаем кнопки каждый раз для обновления порядка
+    container.innerHTML = '';
+    // Фильтруем скрытые уровни, переворачиваем массив и снова переворачиваем при добавлении
+    const visibleLevels = orderedLevels.filter(level => !level.hidden).reverse();
+    visibleLevels.forEach(level => {
+      const button = document.createElement('button');
+      button.id = `level-btn-${level.id}`;
+      button.innerText = `${level.name} (${level.rows} рядов)`;
+      button.className = 'button';
+      button.addEventListener('click', () => onLevelSelect(level.id));
+      container.insertBefore(button, container.firstChild);
     });
   }
 }
