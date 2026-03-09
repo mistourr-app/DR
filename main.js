@@ -16,21 +16,22 @@ let lastTime = 0;
 function resize() {
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
 
-  // Вычитаем высоту UI-панелей из доступной высоты экрана
   const availableHeight = screenH - DIMS.TOP_UI_H - DIMS.BOTTOM_UI_H;
-
-  // Рассчитываем размер ячейки, чтобы всё поместилось на экране
   const size = Math.floor(Math.min(screenW / DIMS.COLS, availableHeight / (DIMS.VISIBLE_ROWS + 1)));
   
   DIMS.CELL_SIZE = size;
   DIMS.CANVAS_WIDTH = DIMS.COLS * DIMS.CELL_SIZE;
-  DIMS.CANVAS_HEIGHT = (DIMS.VISIBLE_ROWS + 1) * DIMS.CELL_SIZE; // +1 для плавного скролла
+  DIMS.CANVAS_HEIGHT = (DIMS.VISIBLE_ROWS + 1) * DIMS.CELL_SIZE;
 
-  canvas.width = DIMS.CANVAS_WIDTH;
-  canvas.height = DIMS.CANVAS_HEIGHT;
+  canvas.width = DIMS.CANVAS_WIDTH * dpr;
+  canvas.height = DIMS.CANVAS_HEIGHT * dpr;
+  canvas.style.width = `${DIMS.CANVAS_WIDTH}px`;
+  canvas.style.height = `${DIMS.CANVAS_HEIGHT}px`;
+  
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Устанавливаем высоту для UI-панелей
   document.getElementById('top-ui-bar').style.height = `${DIMS.TOP_UI_H}px`;
   document.getElementById('bottom-ui-bar').style.height = `${DIMS.BOTTOM_UI_H}px`;
 }
@@ -94,32 +95,26 @@ function update(deltaTime) {
 }
 
 function render() {
-  // Пока что очищаем рендер, так как UI управляется через HTML
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
 
   const state = getGameState();
   switch (state.appState) {
     case AppState.RUN_PLAYING:
-      // Отрисовка верхней панели с кнопкой выхода
       renderTopBar(state.runState, () => {
-        // Логика выхода в меню, аналогичная той, что на экране поражения
         const url = new URL(window.location);
         url.searchParams.delete('seed');
         window.history.pushState({}, '', url);
         setAppState(AppState.META_HUB, onStateChange);
       });
       renderRun();
-      // Отрисовка нижней панели (инвентарь)
       renderUi(state.runState);
       break;
     case AppState.RUN_SUMMARY:
-      // На экране поражения тоже можно рендерить поле, чтобы видеть, где погиб игрок
       if (state.runState) {
         renderRun();
       }
       break;
     case AppState.RUN_VICTORY:
-      // Продолжаем рендерить поле, чтобы видеть побежденного босса под экраном победы
       renderRun();
   }
 }
@@ -129,14 +124,14 @@ function handleCanvasClick(event) {
   if (state.appState !== AppState.RUN_PLAYING || isAnimating()) return;
 
   const rect = canvas.getBoundingClientRect();
-  const canvasX = event.clientX - rect.left;
-  const canvasY = event.clientY - rect.top;
+  const scaleX = DIMS.CANVAS_WIDTH / rect.width;
+  const scaleY = DIMS.CANVAS_HEIGHT / rect.height;
+  const canvasX = (event.clientX - rect.left) * scaleX;
+  const canvasY = (event.clientY - rect.top) * scaleY;
 
-  // Горизонтальная координата рассчитывается просто
   const gx = Math.floor(canvasX / DIMS.CELL_SIZE);
 
-  // Вертикальная координата (gy) требует более сложного расчета из-за разной высоты рядов
-  const worldY = state.runState.scrollY + canvas.height - canvasY;
+  const worldY = state.runState.scrollY + DIMS.CANVAS_HEIGHT - canvasY;
   const regularCellHeight = DIMS.CELL_SIZE;
   const tallCellHeight = DIMS.CELL_SIZE * 2;
   const arenaStartRow = state.runState.totalRows - 2;
@@ -144,14 +139,11 @@ function handleCanvasClick(event) {
 
   let gy;
   if (worldY < dungeonHeight) {
-    // Клик в зоне обычных рядов
     gy = Math.floor(worldY / regularCellHeight);
   } else {
-    // Клик в зоне арены
     gy = arenaStartRow + Math.floor((worldY - dungeonHeight) / tallCellHeight);
   }
 
-  // Передаем управление в логику забега
   processPlayerAction(gx, gy);
 }
 
