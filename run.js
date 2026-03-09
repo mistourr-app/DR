@@ -123,6 +123,17 @@ export function startRun(levelId) {
         isAnimating: false,
       });
     }
+    
+    // Проверка: хотя бы одна клетка должна быть проходимой
+    if (y > 0 && y < levelData.rows - 2) {
+      const allWalls = row.every(cell => cell.type === OBJECT_TYPES.WALL);
+      if (allWalls) {
+        // Освобождаем среднюю клетку
+        row[2].type = OBJECT_TYPES.EMPTY;
+        row[2].data = null;
+      }
+    }
+    
     initialRows.push(row);
   }
   }
