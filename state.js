@@ -13,7 +13,7 @@ const gameState = {
 
   // Состояние мета-прогрессии (сохраняется)
   metaState: {
-    currency: 0,
+    gold: 0,
     upgrades: {},
   },
 };
@@ -27,6 +27,12 @@ export function setAppState(newState, onStateChangeCallback = () => {}) {
   if (oldState === newState) return;
 
   console.log(`State changed: ${oldState} -> ${newState}`);
+  
+  // Очищаем runState ДО изменения состояния, чтобы рендер не успел отрисовать старый уровень
+  if (newState === AppState.META_HUB) {
+    gameState.runState = null;
+  }
+  
   gameState.appState = newState;
   onStateChangeCallback(newState, oldState);
 }
@@ -52,4 +58,9 @@ export function loadMetaState() {
 
 export function saveMetaState() {
   localStorage.setItem(META_STORAGE_KEY, JSON.stringify(gameState.metaState));
+}
+
+export function addGold(amount) {
+  gameState.metaState.gold += amount;
+  saveMetaState();
 }

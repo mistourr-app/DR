@@ -44,6 +44,10 @@ function canEnemySeePlayer(enemy, enemyX, enemyY, playerPos, rows) {
 }
 
 export function getThreatMaps(rows, playerPos) {
+  if (!playerPos) {
+    playerPos = getGameState().runState?.player?.pos;
+  }
+  
   if (!threatMapsDirty && cachedThreatMaps) {
     return cachedThreatMaps;
   }
@@ -84,7 +88,10 @@ export function getThreatMaps(rows, playerPos) {
 
 export function processEnemyTurns(y, playerOldPos, onAllAttacksComplete) {
   const { player, rows } = getGameState().runState;
+  console.log(`[ENEMY_TURNS] Starting enemy turns for row ${y}, playerOldPos:`, playerOldPos);
+  
   if (y < 0) {
+    console.log('[ENEMY_TURNS] Row < 0, completing immediately');
     onAllAttacksComplete();
     return;
   }
@@ -94,18 +101,33 @@ export function processEnemyTurns(y, playerOldPos, onAllAttacksComplete) {
     const cell = rows[y][x];
     if (cell.type === OBJECT_TYPES.ENEMY && cell.data) {
       if (canEnemySeePlayer(cell.data, x, y, playerOldPos, rows)) {
+        console.log(`[ENEMY_TURNS] Enemy at (${x},${y}) can see player, adding to attack queue`);
         attackingEnemies.push(cell);
       }
     }
   }
 
   if (attackingEnemies.length === 0) {
+    console.log('[ENEMY_TURNS] No attacking enemies, completing immediately');
     onAllAttacksComplete();
     return;
   }
+  
+  console.log(`[ENEMY_TURNS] ${attackingEnemies.length} enemies will attack`);
 
   function playNextAttack(index) {
+    const { runState } = getGameState();
+    
+    console.log(`[ENEMY_TURNS] Processing attack ${index + 1}/${attackingEnemies.length}, player HP: ${runState.player.hp}`);
+    
     if (index >= attackingEnemies.length) {
+      console.log('[ENEMY_TURNS] All attacks completed');
+      onAllAttacksComplete();
+      return;
+    }
+    
+    if (runState.player.hp <= 0) {
+      console.log('[ENEMY_TURNS] Player dead, stopping attacks');
       onAllAttacksComplete();
       return;
     }
@@ -119,7 +141,8 @@ export function processEnemyTurns(y, playerOldPos, onAllAttacksComplete) {
       props: { 'visual.y': originalY + DIMS.CELL_SIZE * 0.3 },
       duration: 150,
       onComplete: () => {
-        dealDamageToPlayer(enemy.currentHp, enemy);
+        const damage = dealDamageToPlayer(enemy.currentHp, enemy);
+        console.log(`[ENEMY_TURNS] Enemy dealt ${damage} damage, player HP now: ${runState.player.hp}`);
 
         play({
           target: enemyCell,
@@ -136,4 +159,8 @@ export function processEnemyTurns(y, playerOldPos, onAllAttacksComplete) {
 
 export function isEnemyOnCell(x, y, rows) {
   return rows[y]?.[x]?.type === OBJECT_TYPES.ENEMY;
+}
+
+export function updateEnemyAI() {
+  markThreatMapsDirty();
 }

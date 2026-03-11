@@ -1,4 +1,5 @@
-import { LEVELS } from './registry.js';
+import { LEVELS, CELL_DEFS, OBJECT_TYPES } from './registry.js';
+import { getGameState } from './state.js';
 
 // Получаем ссылки на все оверлеи один раз
 const levelSelectScreen = document.getElementById('level-select-screen');
@@ -21,6 +22,15 @@ export function hideAllScreens() {
   allScreens.forEach(screen => {
     if (screen) screen.style.display = 'none';
   });
+}
+
+export function updateGoldCounter() {
+  const goldAmount = document.getElementById('gold-amount');
+  if (goldAmount) {
+    const { metaState, runState } = getGameState();
+    const totalGold = metaState.gold + (runState?.goldCollected || 0);
+    goldAmount.textContent = totalGold;
+  }
 }
 
 /**
@@ -104,12 +114,12 @@ export function renderTopBar(runState, onExit) {
     // Слоты для бонусов атаки босса
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.attackBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', 'text-yellow-300', false, null, true) : createSlot('-', 'Атака', 'text-gray-500', true, null, true);
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, true) : createSlot('-', 'Атака', '#6b7280', true, null, true);
     }
     // Слоты для бонусов защиты босса
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.defenseBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', 'text-blue-400', false, null, true) : createSlot('-', 'Защита', 'text-gray-500', true, null, true);
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, true) : createSlot('-', 'Защита', '#6b7280', true, null, true);
     }
     bossInventoryDisplay.innerHTML = bossInventoryHtml;
   }
@@ -139,16 +149,16 @@ export function resetTopBar() {
  * @param {boolean} [isSmall=false] - Если true, используется уменьшенный размер для инвентаря босса.
  * @returns {string} - HTML-строка.
  */
-function createSlot(value, label, valueColorClass = 'text-white', isEmpty = false, secondaryValue = null, isSmall = false) {
+function createSlot(value, label, valueColor = '#ffffff', isEmpty = false, secondaryValue = null, secondaryColor = null, isSmall = false) {
   const emptyClass = isEmpty ? 'opacity-40' : '';
   const sizeClasses = isSmall ? 'w-12 h-12' : 'w-16 h-16';
   // Обертка для слота и его подписи
   return `
     <div class="flex flex-col items-center">
       <div class="flex flex-col items-center justify-center ${sizeClasses} bg-gray-800 border border-gray-600 rounded-md p-1 ${emptyClass}">
-        <span class="text-2xl font-black leading-tight ${valueColorClass}">${value}</span>
+        <span class="text-2xl font-black leading-tight" style="color: ${valueColor};">${value}</span>
         <!-- Вторичный текст, используется для зарядов арбалета -->
-        ${secondaryValue ? `<span class="text-xs font-bold text-gray-300">${secondaryValue}</span>` : ''}
+        ${secondaryValue ? `<span class="text-xs font-bold" style="color: ${secondaryColor || '#d1d5db'};">${secondaryValue}</span>` : ''}
       </div>
       <span class="text-xs uppercase text-gray-400 font-semibold mt-1">${label}</span>
     </div>
@@ -168,19 +178,26 @@ export function renderUi(runState) {
   // Слот для арбалета
   const weapon = inventory.weapon;
   if (weapon?.type === 'crossbow') {
-    inventoryHtml += createSlot(`${weapon.damage}`, 'Арбалет', 'text-amber-400', false, `${inventory.ammo}/${inventory.maxAmmo}`);
+    inventoryHtml += createSlot(
+      `${weapon.damage}`, 
+      'Арбалет', 
+      '#ffffff', // Урон белым
+      false, 
+      `${inventory.ammo}/${inventory.maxAmmo}`,
+      CELL_DEFS[OBJECT_TYPES.AMMO].color // Заряды цветом клеток
+    );
   }
 
   // Слоты для бонусов атаки (всегда 2)
   for (let i = 0; i < 2; i++) {
     const bonus = inventory.attackBonuses[i];
-    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', 'text-yellow-300') : createSlot('-', 'Атака', 'text-gray-500', true);
+    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color) : createSlot('-', 'Атака', '#6b7280', true);
   }
 
   // Слоты для бонусов защиты (всегда 2)
   for (let i = 0; i < 2; i++) {
     const bonus = inventory.defenseBonuses[i];
-    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', 'text-blue-400') : createSlot('-', 'Защита', 'text-gray-500', true);
+    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color) : createSlot('-', 'Защита', '#6b7280', true);
   }
 
   // Используем innerHTML, так как это простой и быстрый способ для такого UI
@@ -191,10 +208,29 @@ export function renderUi(runState) {
  * Показывает экран поражения.
  * @param {function(): void} onRestart - Колбэк для кнопки "Попробовать снова".
  * @param {function(): void} onGoToMenu - Колбэк для кнопки "Меню уровней".
+ * @param {string} deathType - Тип смерти: 'damage' или 'exhaustion'
  */
-export function showGameOverScreen(onRestart, onGoToMenu) {
+export function showGameOverScreen(onRestart, onGoToMenu, deathType = 'damage') {
   if (gameOverScreen) {
+    // Устанавливаем текст в зависимости от типа смерти
+    const titleEl = document.getElementById('game-over-title');
+    const messageEl = document.getElementById('game-over-message');
+    
+    if (deathType === 'exhaustion') {
+      titleEl.textContent = 'ИСТОЩЕНИЕ';
+      messageEl.innerHTML = 'Ты застрял без энергии из-за своей опрометчивости.<br>Всегда следи за запасом энергии!';
+    } else {
+      titleEl.textContent = 'СИСТЕМА ПОВРЕЖДЕНА';
+      messageEl.textContent = 'Ваше здоровье упало до нуля';
+    }
+    
+    // Показываем с задержкой
     gameOverScreen.style.display = 'flex';
+    gameOverScreen.style.opacity = '0';
+    
+    setTimeout(() => {
+      gameOverScreen.style.opacity = '1';
+    }, 800); // Задержка 800мс
 
     // Используем тот же подход с cloneNode, чтобы всегда иметь свежие колбэки
     const restartBtn = document.getElementById('restart-level-btn');

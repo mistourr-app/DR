@@ -10,6 +10,7 @@ import { createPRNG, generateArenaObject } from './utils.js';
 import { startTutorial, stopTutorial, updateTutorial, isClickAllowed } from './tutorial.js';
 
 let _onStateChange = () => {};
+let _deathType = 'damage'; // 'damage' или 'exhaustion'
 
 function getRowY(y, totalRows) {
   const regularRows = totalRows - 2;
@@ -22,6 +23,45 @@ function getRowY(y, totalRows) {
 export function initRun(callback) {
   _onStateChange = callback;
   initCombat(callback);
+}
+
+export function getDeathType() {
+  return _deathType;
+}
+
+function checkIfPlayerStuck() {
+  const { runState } = getGameState();
+  if (!runState || runState.levelPhase !== 'dungeon') return false;
+  
+  const { player, rows } = runState;
+  const targetY = player.pos.y + 1;
+  
+  // Проверяем, есть ли доступные ходы
+  if (targetY >= rows.length) return false; // Достигли конца
+  
+  let hasValidMove = false;
+  
+  for (let x = 0; x < DIMS.COLS; x++) {
+    const targetCell = rows[targetY][x];
+    if (targetCell.type === OBJECT_TYPES.WALL) continue;
+    
+    const moveDistance = Math.abs(x - player.pos.x);
+    const energyCost = Math.max(0, moveDistance - 1);
+    
+    if (player.energy >= energyCost) {
+      hasValidMove = true;
+      break;
+    }
+  }
+  
+  if (!hasValidMove) {
+    console.log('[STUCK] Player is stuck without energy!');
+    _deathType = 'exhaustion';
+    setAppState(AppState.RUN_SUMMARY, _onStateChange);
+    return true;
+  }
+  
+  return false;
 }
 
 export function startRun(levelId) {
@@ -79,7 +119,7 @@ export function startRun(levelId) {
     startTutorial();
   } else {
     // Процедурная генерация
-    const { ENEMY, WALL, HEAL, AMMO, ENERGY, ATTACK_BONUS, DEFENSE_BONUS } = levelData.chances;
+    const { ENEMY, WALL, HEAL, AMMO, ENERGY, ATTACK_BONUS, DEFENSE_BONUS, GOLD } = levelData.chances;
 
   for (let y = 0; y < levelData.rows; y++) {
     const row = [];
@@ -110,6 +150,8 @@ export function startRun(levelId) {
         } else if (rand < ENEMY + WALL + HEAL + AMMO + ENERGY + ATTACK_BONUS + DEFENSE_BONUS) {
           type = OBJECT_TYPES.DEFENSE_BONUS;
           data = { value: CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].value };
+        } else if (rand < ENEMY + WALL + HEAL + AMMO + ENERGY + ATTACK_BONUS + DEFENSE_BONUS + (GOLD || 0)) {
+          type = OBJECT_TYPES.GOLD;
         }
       } else if (y >= levelData.rows - 2) {
         const newObject = generateArenaObject(x, y, levelData.rows, random, 1.0);
@@ -144,7 +186,7 @@ export function startRun(levelId) {
     hp: Math.round(playerBaseHp * bossHpMultiplier),
     currentHp: Math.round(playerBaseHp * bossHpMultiplier),
     label: 'БОСС',
-    color: '#c026d3',
+    color: '#FF58F4',
   };
 
   const bossX = 2;
@@ -169,6 +211,7 @@ export function startRun(levelId) {
     totalRows: levelData.rows,
     rows: initialRows,
     boss: boss,
+    goldCollected: 0,
     player: {
       hp: 20,
       maxHp: 20,
@@ -206,7 +249,12 @@ export function processPlayerAction(gx, gy) {
   if (!runState) return;
   const { player, rows } = runState;
 
-  if (runState.turnOwner !== 'player') return;
+  console.log(`[PLAYER_ACTION] Click at (${gx},${gy}), turnOwner: ${runState.turnOwner}`);
+
+  if (runState.turnOwner !== 'player') {
+    console.log('[PLAYER_ACTION] Not player turn, ignoring click');
+    return;
+  }
   
   if (!isClickAllowed(gx, gy)) return;
 
@@ -254,6 +302,14 @@ function processPlayerMove(targetX, targetY) {
   const { player, rows } = runState;
   const targetCell = rows[targetY][targetX];
 
+  console.log(`[PLAYER_MOVE] Moving from (${player.pos.x},${player.pos.y}) to (${targetX},${targetY})`);
+  
+  // Проверяем, разрешен ли ход в туториале
+  if (!isClickAllowed(targetX, targetY)) {
+    console.log('[PLAYER_MOVE] Move not allowed by tutorial');
+    return;
+  }
+
   const moveDistance = Math.abs(targetX - player.pos.x);
   const energyCost = Math.max(0, moveDistance - 1);
 
@@ -265,7 +321,7 @@ function processPlayerMove(targetX, targetY) {
 
   if (runState.levelPhase === 'dungeon' && targetY >= runState.totalRows - 2) {
     runState.levelPhase = 'boss_arena';
-    console.log("Entering Boss Arena phase!");
+    console.log("[PHASE] Entering Boss Arena phase!");
     emit(Events.PHASE_CHANGED, { phase: 'boss_arena' });
   }
 
@@ -284,6 +340,7 @@ function processPlayerMove(targetX, targetY) {
   }
 
   runState.turnOwner = 'processing';
+  console.log('[TURN] turnOwner = processing');
 
   if (targetCell.type === OBJECT_TYPES.WALL) {
     return;
@@ -304,6 +361,8 @@ function processPlayerMove(targetX, targetY) {
       const previousX = player.pos.x;
       player.pos.x = targetX;
       player.pos.y = targetY;
+      
+      console.log(`[PLAYER_MOVE] Animation complete, now at (${targetX},${targetY}), interacting with ${targetCell.type}`);
 
       let turnHandedOverToBoss = false;
 
@@ -341,6 +400,14 @@ function processPlayerMove(targetX, targetY) {
           if (actualAdded > 0) {
             createFloatingText(`+${actualAdded} э.`, '#3b82f6', player.visual);
           }
+          targetCell.type = OBJECT_TYPES.EMPTY;
+          targetCell.data = null;
+          break;
+        }
+        case OBJECT_TYPES.GOLD: {
+          const goldAmount = targetCell.data?.amount || CELL_DEFS[OBJECT_TYPES.GOLD].amount;
+          runState.goldCollected += goldAmount;
+          createFloatingText(`+${goldAmount} з.`, CELL_DEFS[OBJECT_TYPES.GOLD].color, player.visual);
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
           break;
@@ -384,9 +451,32 @@ function processPlayerMove(targetX, targetY) {
           break;
         }
         case OBJECT_TYPES.ATTACK_CELL: {
+          const cellDamage = targetCell.data.value;
           const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-          const totalDamage = targetCell.data.value + bonusDamage;
-          player.inventory.attackBonuses = [];
+          const totalDamage = cellDamage + bonusDamage;
+          
+          // Рассчитываем фактический урон (с учетом защиты босса)
+          let damageAfterDefense = totalDamage;
+          for (const defBonus of runState.boss.inventory.defenseBonuses) {
+            damageAfterDefense -= defBonus.value;
+            if (damageAfterDefense <= 0) break;
+          }
+          const actualDamage = Math.max(0, Math.min(damageAfterDefense, runState.boss.currentHp));
+          
+          // СНАЧАЛА тратятся бонусы атаки
+          let remainingDamage = actualDamage;
+          
+          for (let i = player.inventory.attackBonuses.length - 1; i >= 0 && remainingDamage > 0; i--) {
+            const bonus = player.inventory.attackBonuses[i];
+            const consumedAmount = Math.min(remainingDamage, bonus.value);
+            
+            bonus.value -= consumedAmount;
+            remainingDamage -= consumedAmount;
+
+            if (bonus.value <= 0) {
+              player.inventory.attackBonuses.splice(i, 1);
+            }
+          }
           
           const originalY = player.visual.y;
           play({
@@ -394,9 +484,10 @@ function processPlayerMove(targetX, targetY) {
             props: { 'visual.y': originalY + DIMS.CELL_SIZE * 0.5 },
             duration: 150,
             onComplete: () => {
-              dealDamageToBoss(totalDamage);
+              const finalTotalDamage = cellDamage + player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
+              dealDamageToBoss(finalTotalDamage);
               const bossCell = rows[runState.boss.pos.y][runState.boss.pos.x];
-              createFloatingText(`-${totalDamage}`, '#ef4444', bossCell.visual);
+              createFloatingText(`-${finalTotalDamage}`, '#ef4444', bossCell.visual);
               play({
                 target: player,
                 props: { 'visual.y': originalY },
@@ -441,10 +532,16 @@ function processPlayerMove(targetX, targetY) {
           }
           break;
         }
+        default: {
+          // Пустая клетка или другой тип - ничего не делаем
+          console.log(`[PLAYER_MOVE] Landed on ${targetCell.type}, no special interaction`);
+          break;
+        }
       }
 
       if (runState.levelPhase === 'boss_arena' && !turnHandedOverToBoss) {
         const canMelee = player.inventory.attackBonuses.length > 0 && runState.boss.pos.x === player.pos.x;
+        console.log(`[BOSS_ARENA] Checking melee: canMelee=${canMelee}, turnHandedOver=${turnHandedOverToBoss}`);
         if (canMelee) {
           const originalY = player.visual.y;
           play({
@@ -465,6 +562,7 @@ function processPlayerMove(targetX, targetY) {
             }
           });
         } else {
+          console.log('[BOSS_ARENA] No melee, handing turn to boss');
           setTimeout(processBossTurn, 300);
           turnHandedOverToBoss = true;
         }
@@ -475,12 +573,12 @@ function processPlayerMove(targetX, targetY) {
       if (runState.levelPhase === 'dungeon') {
         const rowPlayerLeft = previousY;
         const colPlayerLeft = previousX;
+        console.log(`[DUNGEON] Processing dungeon phase, targetCell.type=${targetCell.type}`);
         if (targetCell.type !== OBJECT_TYPES.ENEMY) {
           continuePlayerTurnAfterInteraction(rowPlayerLeft, colPlayerLeft, targetY);
+        } else {
+          console.log('[DUNGEON] Enemy combat, turn already handled');
         }
-      }
-      if (targetCell.type !== OBJECT_TYPES.ENEMY && runState.levelPhase === 'dungeon') {
-        runState.turnOwner = 'player';
       }
       
       updateTutorial();
@@ -498,10 +596,27 @@ function processPlayerShot(targetCell) {
   console.log('[TUTORIAL] Player shot, ammo:', player.inventory.ammo);
 
   const enemy = targetCell.data;
+  const weaponDamage = player.inventory.weapon.damage;
   const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-  const totalDamage = player.inventory.weapon.damage + bonusDamage;
+  const totalDamage = weaponDamage + bonusDamage;
   
-  player.inventory.attackBonuses = [];
+  // Рассчитываем фактический урон
+  const actualDamage = Math.min(totalDamage, enemy.currentHp);
+  
+  // СНАЧАЛА тратятся бонусы атаки, потом урон оружия
+  let remainingDamage = actualDamage;
+  
+  for (let i = player.inventory.attackBonuses.length - 1; i >= 0 && remainingDamage > 0; i--) {
+    const bonus = player.inventory.attackBonuses[i];
+    const consumedAmount = Math.min(remainingDamage, bonus.value);
+    
+    bonus.value -= consumedAmount;
+    remainingDamage -= consumedAmount;
+
+    if (bonus.value <= 0) {
+      player.inventory.attackBonuses.splice(i, 1);
+    }
+  }
 
   play({
     target: targetCell,
@@ -513,6 +628,7 @@ function processPlayerShot(targetCell) {
         props: { 'visual.alpha': 1.0 },
         duration: 100,
         onComplete: () => {
+          const totalDamage = weaponDamage + player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
           dealDamageToEnemy(targetCell, totalDamage, false);
 
           if (enemy && enemy.currentHp <= 0) {
@@ -542,15 +658,37 @@ function processPlayerShot(targetCell) {
 
 function processPlayerShotOnBoss(bossCell) {
   const { runState } = getGameState();
-  const { player } = runState;
+  const { player, boss } = runState;
 
   player.inventory.ammo--;
   player.hasShotOnCurrentRow = true;
 
+  const weaponDamage = player.inventory.weapon.damage;
   const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-  const totalDamage = player.inventory.weapon.damage + bonusDamage;
+  const totalDamage = weaponDamage + bonusDamage;
+  
+  // Рассчитываем фактический урон (с учетом защиты босса)
+  let damageAfterDefense = totalDamage;
+  for (const defBonus of boss.inventory.defenseBonuses) {
+    damageAfterDefense -= defBonus.value;
+    if (damageAfterDefense <= 0) break;
+  }
+  const actualDamage = Math.max(0, Math.min(damageAfterDefense, boss.currentHp));
+  
+  // СНАЧАЛА тратятся бонусы атаки
+  let remainingDamage = actualDamage;
+  
+  for (let i = player.inventory.attackBonuses.length - 1; i >= 0 && remainingDamage > 0; i--) {
+    const bonus = player.inventory.attackBonuses[i];
+    const consumedAmount = Math.min(remainingDamage, bonus.value);
+    
+    bonus.value -= consumedAmount;
+    remainingDamage -= consumedAmount;
 
-  player.inventory.attackBonuses = [];
+    if (bonus.value <= 0) {
+      player.inventory.attackBonuses.splice(i, 1);
+    }
+  }
 
   play({
     target: bossCell,
@@ -562,8 +700,9 @@ function processPlayerShotOnBoss(bossCell) {
         props: { 'visual.alpha': 1.0 },
         duration: 100,
         onComplete: () => {
-          dealDamageToBoss(totalDamage);
-          createFloatingText(`-${totalDamage}`, '#ef4444', bossCell.visual);
+          const finalTotalDamage = weaponDamage + player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
+          dealDamageToBoss(finalTotalDamage);
+          createFloatingText(`-${finalTotalDamage}`, '#ef4444', bossCell.visual);
           
           // Возвращаем ход игроку, так как выстрел не заканчивает ход
           if (runState.player.hp > 0 && runState.boss.currentHp > 0) {
@@ -578,15 +717,26 @@ function processPlayerShotOnBoss(bossCell) {
 function continuePlayerTurnAfterInteraction(previousPlayerY, previousPlayerX, targetY) {
   const { runState } = getGameState();
   const { rows } = runState;
+  console.log(`[CONTINUE_TURN] Starting, previousY=${previousPlayerY}, previousX=${previousPlayerX}, targetY=${targetY}`);
+  
   processEnemyTurns(previousPlayerY, { x: previousPlayerX, y: previousPlayerY }, () => {
+    console.log(`[CONTINUE_TURN] Enemy turns completed, player HP: ${runState.player.hp}`);
+    
     if (runState.levelPhase === 'dungeon') {
       runState.targetScrollY = getRowY(targetY, runState.totalRows);
     }
     cleanupDeadEnemies(rows);
 
     if (runState.player.hp <= 0) {
-      console.log("Player has been defeated. Switching to summary screen.");
+      console.log("[CONTINUE_TURN] Player has been defeated. Switching to summary screen.");
+      _deathType = 'damage';
       setAppState(AppState.RUN_SUMMARY, _onStateChange);
+    } else {
+      console.log('[TURN] Returning turn to player');
+      runState.turnOwner = 'player';
+      
+      // Проверяем, не застрял ли игрок
+      checkIfPlayerStuck();
     }
   });
 }

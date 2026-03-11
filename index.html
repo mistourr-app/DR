@@ -144,15 +144,28 @@
         .overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background-color: rgba(9, 10, 12, 0.9);
+            background-color: rgba(9, 10, 12, 0.75);
             z-index: 30;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: #e5e7eb;
             padding: 20px;
+            color: #e5e7eb;
             text-align: center;
+        }
+        .overlay.level-select {
+            background-color: rgba(9, 10, 12, 1);
+        }
+        .overlay.death-screen {
+            justify-content: space-between;
+            padding: 15vh 20px 5vh 20px;
+        }
+        .overlay-content {
+            flex: 0;
+        }
+        .overlay-buttons {
+            flex: 0;
         }
         .overlay h2 { font-size: 2rem; font-weight: 900; margin-bottom: 1rem; }
         .overlay p { color: #94a3b8; margin-bottom: 2rem; }
@@ -186,6 +199,7 @@
             width: 100%;
             box-sizing: border-box;
             z-index: 10;
+            position: relative;
         }
         #bottom-ui-bar { 
             width: 100%; 
@@ -193,6 +207,26 @@
             justify-content: center; 
             align-items: center; 
             z-index: 10;
+        }
+        #gold-counter {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(31, 41, 55, 0.9);
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            font-weight: 700;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            pointer-events: none;
+        }
+        #gold-counter {
+            border: 2px solid var(--gold-color);
+            color: var(--gold-color);
         }
     </style>
     <style>
@@ -219,6 +253,7 @@
 <body>
 
     <div id="top-ui-bar"></div>
+    <div id="gold-counter">💰 <span id="gold-amount">0</span></div>
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
     </div>
@@ -228,7 +263,7 @@
     
     <div id="version">v21</div>
 
-    <div id="level-select-screen" class="overlay" style="display: none;">
+    <div id="level-select-screen" class="overlay level-select" style="display: none;">
         <h2 id="level-select-title" style="cursor: pointer; user-select: none;">ВЫБОР УРОВНЯ</h2>
         <p class="text-slate-500 mb-4">Выберите сектор для развертывания</p>
         <div id="level-buttons-container"></div>
@@ -242,10 +277,12 @@
         </div>
     </div>
 
-    <div id="game-over-screen" class="overlay" style="display: none;">
-        <h2>СИСТЕМА ПОВРЕЖДЕНА</h2>
-        <p>Ваше здоровье упало до нуля. Миссия провалена.</p>
-        <div class="flex flex-col gap-2 w-full max-w-sm">
+    <div id="game-over-screen" class="overlay death-screen" style="display: none; opacity: 0; transition: opacity 0.5s ease-in;">
+        <div class="overlay-content">
+            <h2 id="game-over-title">СИСТЕМА ПОВРЕЖДЕНА</h2>
+            <p id="game-over-message">Ваше здоровье упало до нуля</p>
+        </div>
+        <div class="overlay-buttons flex flex-col gap-2 w-full max-w-sm">
             <button id="restart-level-btn" class="button primary w-full">Попробовать снова</button>
             <button id="game-over-to-menu-btn" class="button w-full">Меню уровней</button>
         </div>
@@ -285,6 +322,11 @@
     </div>
 
     <script type="module" src="main.js?v=21"></script>
+    <script type="module">
+      // Устанавливаем цвет золота из registry.js
+      import { CELL_DEFS, OBJECT_TYPES } from './registry.js';
+      document.documentElement.style.setProperty('--gold-color', CELL_DEFS[OBJECT_TYPES.GOLD].color);
+    </script>
     <script>
       // Скрытый вход в админку: 5 кликов по заголовку
       let clickCount = 0;

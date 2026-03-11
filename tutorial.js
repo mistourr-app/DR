@@ -65,19 +65,24 @@ export const TUTORIAL_STEPS = [
     checkComplete: (state) => state.runState.player.pos.y >= 11
   },
   {
-    text: "Входим в арену босса! Двигайся горизонтально",
-    allowedCells: [{x: 0, y: 11}, {x: 1, y: 11}, {x: 3, y: 11}, {x: 4, y: 11}, {x: 0, y: 12}, {x: 1, y: 12}, {x: 2, y: 12}, {x: 3, y: 12}, {x: 4, y: 12}], // Ряды 12-13 (индексы 11-12)
-    checkComplete: (state) => state.runState.player.pos.y >= 12
+    text: "Атакуй Босса!",
+    allowedCells: [{x: 1, y: 11}], // Соседняя клетка атаки слева
+    checkComplete: (state) => {
+      const player = state.runState.player;
+      const boss = state.runState.boss;
+      // Проверяем, что игрок на клетке (1, 11) И босс получил урон
+      return player.pos.x === 1 && player.pos.y === 11 && boss.currentHp < boss.hp;
+    }
   },
   {
-    text: "Наступи на клетку атаки чтобы ударить босса",
-    allowedCells: null, // Динамические клетки атаки
-    checkComplete: (state) => state.runState.boss.currentHp < state.runState.boss.hp
-  },
-  {
-    text: "Победи босса!",
-    allowedCells: null,
-    checkComplete: (state) => state.runState.boss.currentHp <= 0
+    text: "Finish Him!",
+    allowedCells: [{x: 3, y: 11}], // Клетка атаки справа (прыжок через центр)
+    checkComplete: (state) => {
+      const player = state.runState.player;
+      const boss = state.runState.boss;
+      // Проверяем, что игрок на клетке (3, 11) И босс мертв
+      return player.pos.x === 3 && player.pos.y === 11 && boss.currentHp <= 0;
+    }
   }
 ];
 
@@ -137,23 +142,7 @@ export function isClickAllowed(x, y) {
   
   // Для шагов с динамическими клетками (attack_cell в боссфайте)
   if (!step.allowedCells) {
-    const state = getGameState();
-    const { runState } = state;
-    
-    // Шаг 14: клик на клетку атаки
-    if (currentStep === 14 && runState.levelPhase === 'boss_arena') {
-      const cell = runState.rows[y]?.[x];
-      const allowed = cell?.type === 'attack_cell';
-      console.log('[TUTORIAL] Click check (step 14):', x, y, 'allowed:', allowed, 'cell type:', cell?.type);
-      return allowed;
-    }
-    
-    // Шаг 15: любой клик разрешен (победи босса)
-    if (currentStep === 15) {
-      console.log('[TUTORIAL] Click check (step 15): allowed (any)');
-      return true;
-    }
-    
+    // Все шаги теперь используют allowedCells, этот блок не должен выполняться
     return true;
   }
   

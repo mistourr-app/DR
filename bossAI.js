@@ -4,11 +4,19 @@ import { DIMS } from './config.js';
 import { dealDamageToPlayer } from './combat.js';
 import { play } from './animation.js';
 import { createPRNG, generateArenaObject } from './utils.js';
+import { updateTutorial } from './tutorial.js';
 
 export function processBossTurn() {
   const { runState, runState: { player, boss, rows, seed } } = getGameState();
+  
+  // Проверяем, жив ли босс
+  if (!boss || boss.currentHp <= 0) {
+    console.log('[BOSS_TURN] Boss is dead, skipping turn');
+    return;
+  }
+  
   runState.turnOwner = 'processing';
-  console.log("Boss is taking a turn.");
+  console.log("[BOSS_TURN] Boss is taking a turn, player HP:", player.hp, "boss HP:", boss.currentHp);
 
   const random = createPRNG(seed + boss.pos.x * boss.pos.y);
 
@@ -147,7 +155,11 @@ export function processBossTurn() {
               duration: 150,
               onComplete: () => {
                 if (player.hp > 0) {
+                  console.log('[BOSS_TURN] Boss attack complete, returning to player');
                   runState.turnOwner = 'player';
+                  updateTutorial();
+                } else {
+                  console.log('[BOSS_TURN] Player dead after boss attack');
                 }
               }
             });
@@ -157,7 +169,11 @@ export function processBossTurn() {
       }
 
       if (player.hp > 0) {
+        console.log('[BOSS_TURN] Boss turn complete, returning to player');
         runState.turnOwner = 'player';
+        updateTutorial();
+      } else {
+        console.log('[BOSS_TURN] Player dead');
       }
     }
   });

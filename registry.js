@@ -171,7 +171,8 @@ export const LEVELS = [
       "AMMO": 0.04,
       "ENERGY": 0.04,
       "ATTACK_BONUS": 0.03,
-      "DEFENSE_BONUS": 0.03
+      "DEFENSE_BONUS": 0.03,
+      "GOLD": 0.03
     }
   },
   {
@@ -186,7 +187,8 @@ export const LEVELS = [
       "AMMO": 0.05,
       "ENERGY": 0.06,
       "ATTACK_BONUS": 0.05,
-      "DEFENSE_BONUS": 0.06
+      "DEFENSE_BONUS": 0.06,
+      "GOLD": 0.03
     }
   },
   {
@@ -201,7 +203,8 @@ export const LEVELS = [
       "AMMO": 0.05,
       "ENERGY": 0.05,
       "ATTACK_BONUS": 0.05,
-      "DEFENSE_BONUS": 0.05
+      "DEFENSE_BONUS": 0.05,
+      "GOLD": 0.03
     }
   },
   {
@@ -216,7 +219,8 @@ export const LEVELS = [
       "AMMO": 0.04,
       "ENERGY": 0.04,
       "ATTACK_BONUS": 0.03,
-      "DEFENSE_BONUS": 0.03
+      "DEFENSE_BONUS": 0.03,
+      "GOLD": 0.03
     }
   }
 ];
@@ -236,6 +240,7 @@ export const OBJECT_TYPES = {
   DEFENSE_BONUS: 'defense_bonus',
   BOSS: 'boss',
   ATTACK_CELL: 'attack_cell',
+  GOLD: 'gold',
 };
 
 export const ENEMY_DEFS = {
@@ -244,54 +249,60 @@ export const ENEMY_DEFS = {
     hp: 4,
     visionRange: 4, // Видит на 3 клетки вперед
     actionRange: 4, // Может атаковать с расстояния в 3 клетки
-    color: '#f87171'
+    color: '#FF1F1F'
   },
   TYPE_2: {
     label: 'СТРАЖ',
     hp: 8,
     visionRange: 2, // Видит на 2 клетки вперед
     actionRange: 2, // Может атаковать с расстояния в 2 клетки
-    color: '#ef4444'
+    color: '#FF1F1F'
   }
 };
 
 export const CELL_DEFS = {
   [OBJECT_TYPES.WALL]: {
     label: 'Стена',
-    color: '#3f4556',
+    color: '#3F4556',
     blocksMovement: true
   },
   [OBJECT_TYPES.HEAL]: {
     label: 'ЗДОРОВЬЕ',
     value: '+6',
     amount: 6,
-    color: '#10b981'
+    color: '#10B981'
   },
   [OBJECT_TYPES.AMMO]: {
     label: 'ЗАРЯДЫ',
     value: '+2',
     amount: 2,
-    color: '#f59e0b' // Amber color
+    color: '#5CFAFF'
   },
   [OBJECT_TYPES.ENERGY]: {
     label: 'ЭНЕРГИЯ',
     value: '+10',
     amount: 10,
-    color: '#3b82f6' // Blue color
+    color: '#9E6DFF'
   },
   [OBJECT_TYPES.ATTACK_BONUS]: {
     label: 'АТАКА',
     value: 5,
-    color: '#fde047' // Yellow-300
+    color: '#FF731B'
   },
   [OBJECT_TYPES.DEFENSE_BONUS]: {
     label: 'ЗАЩИТА',
     value: 5,
-    color: '#a5b4fc' // Indigo-300
+    color: '#0084FF'
   },
   [OBJECT_TYPES.ATTACK_CELL]: {
     label: 'АТАКА',
     value: 10, // Урон по умолчанию для клетки атаки
-    color: '#fca5a5' // Red-300
+    color: '#C40014'
+  },
+  [OBJECT_TYPES.GOLD]: {
+    label: 'ЗОЛОТО',
+    value: '+5',
+    amount: 5,
+    color: '#FFE761'
   }
 };

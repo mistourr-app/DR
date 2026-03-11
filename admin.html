@@ -276,6 +276,10 @@
                   <label class="block text-xs text-gray-400">Бонус защиты (%)</label>
                   <input id="edit-defense-bonus" type="number" step="1" value="${selectedLevel.chances.DEFENSE_BONUS * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
+                <div>
+                  <label class="block text-xs text-gray-400">Золото (%)</label>
+                  <input id="edit-gold" type="number" step="1" value="${(selectedLevel.chances.GOLD || 0) * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
+                </div>
               </div>
             ` : '<p class="text-gray-400 text-sm">Это туториал с фиксированным layout</p>'}
           </div>
@@ -306,7 +310,8 @@
         parseFloat(document.getElementById('edit-ammo').value || 0) +
         parseFloat(document.getElementById('edit-energy').value || 0) +
         parseFloat(document.getElementById('edit-attack-bonus').value || 0) +
-        parseFloat(document.getElementById('edit-defense-bonus').value || 0);
+        parseFloat(document.getElementById('edit-defense-bonus').value || 0) +
+        parseFloat(document.getElementById('edit-gold').value || 0);
       
       const empty = Math.max(0, 100 - total);
       document.getElementById('empty-percent').textContent = empty.toFixed(0);
@@ -328,7 +333,8 @@
           AMMO: parseFloat(document.getElementById('edit-ammo').value) / 100,
           ENERGY: parseFloat(document.getElementById('edit-energy').value) / 100,
           ATTACK_BONUS: parseFloat(document.getElementById('edit-attack-bonus').value) / 100,
-          DEFENSE_BONUS: parseFloat(document.getElementById('edit-defense-bonus').value) / 100
+          DEFENSE_BONUS: parseFloat(document.getElementById('edit-defense-bonus').value) / 100,
+          GOLD: parseFloat(document.getElementById('edit-gold').value) / 100
         } : undefined
       };
 
@@ -388,7 +394,8 @@
           AMMO: 0.04,
           ENERGY: 0.04,
           ATTACK_BONUS: 0.03,
-          DEFENSE_BONUS: 0.03
+          DEFENSE_BONUS: 0.03,
+          GOLD: 0.03
         }
       };
 

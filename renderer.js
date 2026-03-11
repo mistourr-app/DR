@@ -1,6 +1,6 @@
 import { getGameState } from './state.js';
 import { DIMS } from './config.js';
-import { OBJECT_TYPES, CELL_DEFS } from './registry.js';
+import { OBJECT_TYPES, CELL_DEFS, ENEMY_DEFS } from './registry.js';
 import { getThreatMaps } from './enemyAI.js';
 import { getCurrentStep, getTutorialAllowedCells } from './tutorial.js';
 
@@ -8,6 +8,7 @@ let ctx;
 
 // --- Константы для отрисовки ---
 const CARD_PADDING = 6;
+const ENERGY_COLOR = CELL_DEFS[OBJECT_TYPES.ENERGY].color; // Цвет энергии из registry
 
 export function initRenderer(canvasContext) {
   ctx = canvasContext;
@@ -76,11 +77,9 @@ export function renderRun() {
   // Отрисовка тактических элементов (линия выстрела)
   renderTacticalElements(scrollY);
 
-  // Отрисовка игрока
-  if (player.hp > 0) {
-    const playerDrawY = ctx.canvas.height - (player.visual.y - scrollY) - player.visual.h;
-    drawPlayerCard(player.visual.x, playerDrawY);
-  }
+  // Отрисовка игрока (всегда, даже если HP <= 0)
+  const playerDrawY = ctx.canvas.height - (player.visual.y - scrollY) - player.visual.h;
+  drawPlayerCard(player.visual.x, playerDrawY);
 
   // Pass 3: Отрисовываем всплывающий текст поверх всего
   renderFloatingTexts(scrollY);
@@ -134,51 +133,80 @@ function drawCard(x, y, cell, gx, gy, isVisible, isPassed, isInRange, idleThreat
   let lineWidth = 1;
   ctx.setLineDash([]); // Сплошная линия по умолчанию
 
-  // Подсветка разрешенных клеток в tutorial
-  const tutorialCells = getTutorialAllowedCells();
-  if (tutorialCells && tutorialCells.some(c => c.x === gx && c.y === gy)) {
-    strokeStyle = "#22c55e"; // Ярко-зеленый
-    lineWidth = 3;
-  }
-
   const isDungeonMoveTarget = levelPhase === 'dungeon' && gy === player.pos.y + 1;
   // На арене подсвечиваем только горизонтальные ходы
   const isArenaMoveTarget = levelPhase === 'boss_arena' && 
                             gy === player.pos.y && 
                             gx !== player.pos.x;
 
-  if (isVisible && (isDungeonMoveTarget || isArenaMoveTarget) && cell.type !== OBJECT_TYPES.WALL) {
+  // Подсветка разрешенных клеток в tutorial
+  const tutorialCells = getTutorialAllowedCells();
+  const isTutorialCell = tutorialCells && tutorialCells.some(c => c.x === gx && c.y === gy);
+  
+  // В туториале подсвечиваем ТОЛЬКО клетки из allowedCells
+  if (tutorialCells && isTutorialCell) {
+    // Проверяем, является ли это клеткой для движения или клеткой атаки
+    const isMoveCell = (isDungeonMoveTarget || isArenaMoveTarget) && cell.type !== OBJECT_TYPES.WALL;
+    const isAttackCell = cell.type === OBJECT_TYPES.ATTACK_CELL;
+    
+    if (isMoveCell || isAttackCell) {
+      const moveDistance = Math.abs(gx - player.pos.x);
+      const energyCost = Math.max(0, moveDistance - 1);
+
+      if (player.energy >= energyCost) {
+        // Если ход платный (требует энергию), подсвечиваем цветом энергии
+        if (energyCost > 0) {
+          strokeStyle = ENERGY_COLOR; // Цвет энергии для платных ходов
+          lineWidth = 3;
+        } else {
+          strokeStyle = "#22c55e"; // Ярко-зеленый для бесплатных ходов
+          lineWidth = 3;
+        }
+      } else {
+        strokeStyle = ENERGY_COLOR; // Цвет энергии, пунктирный если не хватает
+        lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+      }
+    }
+  }
+  // В обычной игре (без туториала) подсвечиваем все возможные ходы
+  else if (!tutorialCells && isVisible && (isDungeonMoveTarget || isArenaMoveTarget) && cell.type !== OBJECT_TYPES.WALL) {
     // Логика для подсветки возможных ходов
     const moveDistance = Math.abs(gx - player.pos.x);
     const energyCost = Math.max(0, moveDistance - 1);
 
     if (energyCost === 0) {
-      strokeStyle = "#4ade80"; // Зеленый для примыкающих клеток
+      strokeStyle = "#4ade80"; // Зеленый для бесплатных ходов
       lineWidth = 2;
     } else if (player.energy >= energyCost) {
-      strokeStyle = "#3b82f6"; // Голубой, если энергии хватает
+      strokeStyle = ENERGY_COLOR; // Цвет энергии для платных ходов
       lineWidth = 2;
     } else {
-      strokeStyle = "#3b82f6"; // Голубой, но пунктирный, если энергии не хватает
+      strokeStyle = ENERGY_COLOR; // Цвет энергии, но пунктирный, если энергии не хватает
       ctx.setLineDash([4, 4]);
     }
-  } else if (cell.type === OBJECT_TYPES.BOSS) {
+  }
+  else if (cell.type === OBJECT_TYPES.BOSS) {
     // Логика для подсветки босса как цели
     const canUseCrossbow = player.inventory.ammo > 0;
     // Атака в ближнем бою возможна, если есть бонус и игрок на соседней клетке
     const canUseMelee = player.inventory.attackBonuses.length > 0 && player.pos.x === gx;
 
     if (canUseMelee) {
-      strokeStyle = "#fde047"; // Желтый, как бонус атаки
+      strokeStyle = CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color;
       lineWidth = 2;
     } else if (canUseCrossbow) {
-      strokeStyle = "#f59e0b"; // Оранжевый, как патроны
+      strokeStyle = CELL_DEFS[OBJECT_TYPES.AMMO].color;
       lineWidth = 2;
     }
     else {
-      strokeStyle = "#a855f7"; // Фиолетовый, базовый цвет босса
+      strokeStyle = cell.data.color; // Цвет босса
       lineWidth = 2;
     }
+  } else if (cell.type === OBJECT_TYPES.ENEMY) {
+    // Рамка врага его цветом (или зеленым в туториале)
+    strokeStyle = isTutorialCell ? "#22c55e" : cell.data.color;
+    lineWidth = isTutorialCell ? 3 : 1;
   }
 
   ctx.strokeStyle = strokeStyle;
@@ -340,6 +368,15 @@ function renderContent(cell, w, h) {
       ctx.fillText(def.value, w / 2, h / 2 + (8 * fontScale));
       break;
     }
+    case OBJECT_TYPES.GOLD: {
+      const def = CELL_DEFS[OBJECT_TYPES.GOLD];
+      ctx.fillStyle = def.color;
+      ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
+      ctx.fillText(def.label, w / 2, 18 * fontScale);
+      ctx.font = `900 ${Math.round(14 * fontScale)}px Inter, sans-serif`;
+      ctx.fillText(def.value, w / 2, h / 2 + (8 * fontScale));
+      break;
+    }
     case OBJECT_TYPES.ATTACK_BONUS: {
       const def = CELL_DEFS[cell.type];
       ctx.fillStyle = def.color;
@@ -374,8 +411,8 @@ function renderContent(cell, w, h) {
       ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
       ctx.fillText(d.label, w / 2, 18 * fontScale);
 
-      // HP Врага
-      ctx.fillStyle = "#fff";
+      // HP Врага - тем же цветом
+      ctx.fillStyle = d.color;
       ctx.font = `900 ${Math.round(14 * fontScale)}px Inter, sans-serif`;
       ctx.fillText(d.currentHp, w / 2, h / 2 + (8 * fontScale));
       break;
@@ -388,8 +425,8 @@ function renderContent(cell, w, h) {
       ctx.font = `bold ${Math.round(10 * fontScale)}px Inter, sans-serif`;
       ctx.fillText(d.label, w / 2, 20 * fontScale);
 
-      // HP Босса
-      ctx.fillStyle = "#fff";
+      // HP Босса - тем же цветом
+      ctx.fillStyle = d.color;
       ctx.font = `900 ${Math.round(16 * fontScale)}px Inter, sans-serif`;
       ctx.fillText(d.currentHp, w / 2, h / 2 + (10 * fontScale));
       break;
@@ -424,14 +461,24 @@ function drawPlayerCard(x, y) {
   ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
   ctx.fillText("ИГРОК", w / 2, 18 * fontScale);
 
-  // Здоровье
-  ctx.fillStyle = "#fff";
+  // Здоровье (красное если HP <= 0)
+  const hpColor = player.hp <= 0 ? "#ef4444" : "#fff";
+  ctx.fillStyle = hpColor;
   ctx.font = `900 ${Math.round(14 * fontScale)}px Inter, sans-serif`;
   ctx.fillText(Math.max(0, player.hp), w / 2, h / 2 + (8 * fontScale));
 
-  // Энергия
-  ctx.fillStyle = "#3b82f6"; // Синий цвет для энергии
-  ctx.font = `bold ${Math.round(6 * fontScale)}px Inter, sans-serif`;
+  // Энергия с подсветкой при критических значениях
+  const energyPercent = player.energy / player.maxEnergy;
+  let energyColor = ENERGY_COLOR; // Цвет энергии из registry
+  
+  if (energyPercent <= 0) {
+    energyColor = "#ef4444"; // Красный при 0
+  } else if (energyPercent <= 0.3) {
+    energyColor = "#f59e0b"; // Оранжевый при <= 30%
+  }
+  
+  ctx.fillStyle = energyColor;
+  ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
   ctx.fillText(`Э: ${player.energy}/${player.maxEnergy}`, w / 2, h - (6 * fontScale));
 
   ctx.restore();

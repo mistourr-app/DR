@@ -1,7 +1,7 @@
 import { AppState, DIMS } from './config.js';
-import { getGameState, setAppState, loadMetaState } from './state.js';
-import { showLevelSelectScreen, hideAllScreens, showGameOverScreen, showVictoryScreen, renderUi, renderTopBar, resetTopBar } from './ui.js';
-import { startRun, processPlayerAction, initRun } from './run.js';
+import { getGameState, setAppState, loadMetaState, addGold } from './state.js';
+import { showLevelSelectScreen, hideAllScreens, showGameOverScreen, showVictoryScreen, renderUi, renderTopBar, resetTopBar, updateGoldCounter } from './ui.js';
+import { startRun, processPlayerAction, initRun, getDeathType } from './run.js';
 import { initRenderer, renderRun } from './renderer.js';
 import { updateAnimations, isAnimating } from './animation.js';
 import { isClickAllowed, stopTutorial } from './tutorial.js';
@@ -48,7 +48,16 @@ function onStateChange(newState, oldState) {
       });
       break;
     case AppState.RUN_SUMMARY: {
-      const lastRunLevelId = getGameState().runState?.levelId;
+      const state = getGameState();
+      const lastRunLevelId = state.runState?.levelId;
+      const goldCollected = state.runState?.goldCollected || 0;
+      
+      // Сохраняем золото при смерти
+      if (goldCollected > 0) {
+        addGold(goldCollected);
+      }
+      
+      const deathType = getDeathType();
       showGameOverScreen(
         () => { // onRestart
           if (lastRunLevelId) {
@@ -62,11 +71,20 @@ function onStateChange(newState, oldState) {
           url.searchParams.delete('seed');
           window.history.pushState({}, '', url);
           setAppState(AppState.META_HUB, onStateChange);
-        }
+        },
+        deathType
       );
       break;
     }
     case AppState.RUN_VICTORY: {
+      const state = getGameState();
+      const goldCollected = state.runState?.goldCollected || 0;
+      
+      // Сохраняем золото при победе
+      if (goldCollected > 0) {
+        addGold(goldCollected);
+      }
+      
       showVictoryScreen(() => { // onGoToMenu
         stopTutorial();
         const url = new URL(window.location);
@@ -93,9 +111,21 @@ function update(deltaTime) {
 }
 
 function render() {
+  const state = getGameState();
+  
+  // Обновляем счётчик золота на каждом кадре
+  updateGoldCounter();
+  
+  // Не рендерим canvas в меню для экономии ресурсов
+  if (state.appState === AppState.META_HUB) {
+    // Заливаем чёрным цветом
+    ctx.fillStyle = '#090a0c';
+    ctx.fillRect(0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
+    return;
+  }
+  
   ctx.clearRect(0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
 
-  const state = getGameState();
   switch (state.appState) {
     case AppState.RUN_PLAYING:
       renderTopBar(state.runState, () => {
