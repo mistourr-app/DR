@@ -9,6 +9,47 @@ export function initCombat(onStateChangeCallback) {
   _onStateChange = onStateChangeCallback;
 }
 
+/**
+ * Универсальная функция для расчета и расхода бонусов атаки
+ * @param {number} baseDamage - Базовый урон (оружие, HP игрока, клетка атаки)
+ * @param {number} targetMaxHp - Максимальный урон, который можно нанести (текущее HP цели)
+ * @param {Array} defenseBonuses - Бонусы защиты цели (необязательно, для босса)
+ * @returns {number} Фактический урон, который будет нанесен
+ */
+export function calculateAndConsumeAttackBonuses(baseDamage, targetMaxHp, defenseBonuses = []) {
+  const { player } = getGameState().runState;
+  
+  // Рассчитываем общий урон
+  const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
+  let totalDamage = baseDamage + bonusDamage;
+  
+  // Учитываем защиту цели (для босса)
+  for (const defBonus of defenseBonuses) {
+    totalDamage -= defBonus.value;
+    if (totalDamage <= 0) break;
+  }
+  
+  // Фактический урон не может превышать HP цели
+  const actualDamage = Math.max(0, Math.min(totalDamage, targetMaxHp));
+  
+  // Частично расходуем бонусы атаки
+  let remainingDamage = actualDamage;
+  
+  for (let i = player.inventory.attackBonuses.length - 1; i >= 0 && remainingDamage > 0; i--) {
+    const bonus = player.inventory.attackBonuses[i];
+    const consumedAmount = Math.min(remainingDamage, bonus.value);
+    
+    bonus.value -= consumedAmount;
+    remainingDamage -= consumedAmount;
+
+    if (bonus.value <= 0) {
+      player.inventory.attackBonuses.splice(i, 1);
+    }
+  }
+  
+  return actualDamage;
+}
+
 export function dealDamageToPlayer(incomingDamage, source = null) {
   const { runState } = getGameState();
   const { player } = runState;
@@ -130,9 +171,10 @@ export function processMeleeCombat(enemyCell) {
   const playerAttackPower = player.hp;
   const enemyAttackPower = enemy.currentHp;
 
-  const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-  const totalPlayerDamage = bonusDamage + playerAttackPower;
-  dealDamageToEnemy(enemyCell, totalPlayerDamage, true);
+  // Используем универсальную функцию
+  const actualDamage = calculateAndConsumeAttackBonuses(playerAttackPower, enemy.currentHp);
+  
+  dealDamageToEnemy(enemyCell, actualDamage, false);
 
   const damageToPlayer = dealDamageToPlayer(enemyAttackPower, enemy);
 

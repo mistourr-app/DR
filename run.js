@@ -3,7 +3,7 @@ import { getLevelById, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS } from './registry.js
 import { DIMS, AppState } from './config.js';
 import { play } from './animation.js';
 import { Events, emit, clear as clearEvents } from './events.js';
-import { dealDamageToEnemy, dealDamageToBoss, processMeleeCombat, dealDamageToPlayer, initCombat, processPlayerMeleeOnBoss } from './combat.js';
+import { dealDamageToEnemy, dealDamageToBoss, processMeleeCombat, dealDamageToPlayer, initCombat, processPlayerMeleeOnBoss, calculateAndConsumeAttackBonuses } from './combat.js';
 import { cleanupDeadEnemies, processEnemyTurns, markThreatMapsDirty } from './enemyAI.js';
 import { processBossTurn } from './bossAI.js';
 import { createPRNG, generateArenaObject } from './utils.js';
@@ -452,31 +452,9 @@ function processPlayerMove(targetX, targetY) {
         }
         case OBJECT_TYPES.ATTACK_CELL: {
           const cellDamage = targetCell.data.value;
-          const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-          const totalDamage = cellDamage + bonusDamage;
           
-          // Рассчитываем фактический урон (с учетом защиты босса)
-          let damageAfterDefense = totalDamage;
-          for (const defBonus of runState.boss.inventory.defenseBonuses) {
-            damageAfterDefense -= defBonus.value;
-            if (damageAfterDefense <= 0) break;
-          }
-          const actualDamage = Math.max(0, Math.min(damageAfterDefense, runState.boss.currentHp));
-          
-          // СНАЧАЛА тратятся бонусы атаки
-          let remainingDamage = actualDamage;
-          
-          for (let i = player.inventory.attackBonuses.length - 1; i >= 0 && remainingDamage > 0; i--) {
-            const bonus = player.inventory.attackBonuses[i];
-            const consumedAmount = Math.min(remainingDamage, bonus.value);
-            
-            bonus.value -= consumedAmount;
-            remainingDamage -= consumedAmount;
-
-            if (bonus.value <= 0) {
-              player.inventory.attackBonuses.splice(i, 1);
-            }
-          }
+          // Используем универсальную функцию с учетом защиты босса
+          const actualDamage = calculateAndConsumeAttackBonuses(cellDamage, runState.boss.currentHp, runState.boss.inventory.defenseBonuses);
           
           const originalY = player.visual.y;
           play({
@@ -484,10 +462,9 @@ function processPlayerMove(targetX, targetY) {
             props: { 'visual.y': originalY + DIMS.CELL_SIZE * 0.5 },
             duration: 150,
             onComplete: () => {
-              const finalTotalDamage = cellDamage + player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-              dealDamageToBoss(finalTotalDamage);
+              dealDamageToBoss(actualDamage);
               const bossCell = rows[runState.boss.pos.y][runState.boss.pos.x];
-              createFloatingText(`-${finalTotalDamage}`, '#ef4444', bossCell.visual);
+              createFloatingText(`-${actualDamage}`, '#ef4444', bossCell.visual);
               play({
                 target: player,
                 props: { 'visual.y': originalY },
@@ -597,26 +574,9 @@ function processPlayerShot(targetCell) {
 
   const enemy = targetCell.data;
   const weaponDamage = player.inventory.weapon.damage;
-  const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-  const totalDamage = weaponDamage + bonusDamage;
   
-  // Рассчитываем фактический урон
-  const actualDamage = Math.min(totalDamage, enemy.currentHp);
-  
-  // СНАЧАЛА тратятся бонусы атаки, потом урон оружия
-  let remainingDamage = actualDamage;
-  
-  for (let i = player.inventory.attackBonuses.length - 1; i >= 0 && remainingDamage > 0; i--) {
-    const bonus = player.inventory.attackBonuses[i];
-    const consumedAmount = Math.min(remainingDamage, bonus.value);
-    
-    bonus.value -= consumedAmount;
-    remainingDamage -= consumedAmount;
-
-    if (bonus.value <= 0) {
-      player.inventory.attackBonuses.splice(i, 1);
-    }
-  }
+  // Используем универсальную функцию
+  const actualDamage = calculateAndConsumeAttackBonuses(weaponDamage, enemy.currentHp);
 
   play({
     target: targetCell,
@@ -628,8 +588,8 @@ function processPlayerShot(targetCell) {
         props: { 'visual.alpha': 1.0 },
         duration: 100,
         onComplete: () => {
-          const totalDamage = weaponDamage + player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-          dealDamageToEnemy(targetCell, totalDamage, false);
+          dealDamageToEnemy(targetCell, actualDamage, false);
+          createFloatingText(`-${actualDamage}`, '#ef4444', targetCell.visual);
 
           if (enemy && enemy.currentHp <= 0) {
             targetCell.isAnimating = true;
@@ -664,31 +624,9 @@ function processPlayerShotOnBoss(bossCell) {
   player.hasShotOnCurrentRow = true;
 
   const weaponDamage = player.inventory.weapon.damage;
-  const bonusDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-  const totalDamage = weaponDamage + bonusDamage;
   
-  // Рассчитываем фактический урон (с учетом защиты босса)
-  let damageAfterDefense = totalDamage;
-  for (const defBonus of boss.inventory.defenseBonuses) {
-    damageAfterDefense -= defBonus.value;
-    if (damageAfterDefense <= 0) break;
-  }
-  const actualDamage = Math.max(0, Math.min(damageAfterDefense, boss.currentHp));
-  
-  // СНАЧАЛА тратятся бонусы атаки
-  let remainingDamage = actualDamage;
-  
-  for (let i = player.inventory.attackBonuses.length - 1; i >= 0 && remainingDamage > 0; i--) {
-    const bonus = player.inventory.attackBonuses[i];
-    const consumedAmount = Math.min(remainingDamage, bonus.value);
-    
-    bonus.value -= consumedAmount;
-    remainingDamage -= consumedAmount;
-
-    if (bonus.value <= 0) {
-      player.inventory.attackBonuses.splice(i, 1);
-    }
-  }
+  // Используем универсальную функцию с учетом защиты босса
+  const actualDamage = calculateAndConsumeAttackBonuses(weaponDamage, boss.currentHp, boss.inventory.defenseBonuses);
 
   play({
     target: bossCell,
@@ -700,9 +638,8 @@ function processPlayerShotOnBoss(bossCell) {
         props: { 'visual.alpha': 1.0 },
         duration: 100,
         onComplete: () => {
-          const finalTotalDamage = weaponDamage + player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-          dealDamageToBoss(finalTotalDamage);
-          createFloatingText(`-${finalTotalDamage}`, '#ef4444', bossCell.visual);
+          dealDamageToBoss(actualDamage);
+          createFloatingText(`-${actualDamage}`, '#ef4444', bossCell.visual);
           
           // Возвращаем ход игроку, так как выстрел не заканчивает ход
           if (runState.player.hp > 0 && runState.boss.currentHp > 0) {
