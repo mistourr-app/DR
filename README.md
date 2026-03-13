@@ -141,13 +141,7 @@ BOOT → META_HUB → RUN_PLAYING → RUN_SUMMARY/RUN_VICTORY → META_HUB
 
 ---
 
-## Разработка
 
-### Запуск
-```bash
-node server.js
-```
-Игра доступна на `http://localhost:5500`
 
 ### Обучение
 Выберите уровень "Обучение (13 рядов)" для прохождения интерактивного tutorial.
