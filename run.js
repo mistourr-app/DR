@@ -346,17 +346,32 @@ function processPlayerMove(targetX, targetY) {
     return;
   }
 
-  const targetHeight = (targetY >= runState.totalRows - 2) ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
+  // Сначала обрабатываем атаки врагов из текущего ряда
+  const previousY = player.pos.y;
+  const previousX = player.pos.x;
+  
+  processEnemyTurns(previousY, { x: previousX, y: previousY }, () => {
+    console.log(`[PLAYER_MOVE] Enemy attacks completed, player HP: ${player.hp}`);
+    
+    if (player.hp <= 0) {
+      console.log('[PLAYER_MOVE] Player died from enemy attacks');
+      _deathType = 'damage';
+      setAppState(AppState.RUN_SUMMARY, _onStateChange);
+      return;
+    }
+    
+    // Игрок жив, запускаем анимацию перемещения
+    const targetHeight = (targetY >= runState.totalRows - 2) ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
 
-  play({
-    target: player,
-    props: {
-      'visual.x': targetX * DIMS.CELL_SIZE,
-      'visual.y': getRowY(targetY, runState.totalRows),
-      'visual.h': targetHeight,
-    },
-    duration: 250,
-    onComplete: () => {
+    play({
+      target: player,
+      props: {
+        'visual.x': targetX * DIMS.CELL_SIZE,
+        'visual.y': getRowY(targetY, runState.totalRows),
+        'visual.h': targetHeight,
+      },
+      duration: 250,
+      onComplete: () => {
       const previousY = player.pos.y;
       const previousX = player.pos.x;
       player.pos.x = targetX;
@@ -484,8 +499,14 @@ function processPlayerMove(targetX, targetY) {
         }
         case OBJECT_TYPES.ENEMY: {
           const didPlayerWin = processMeleeCombat(targetCell);
+          
+          // Сразу после боя обновляем карты угроз, если враг мертв
+          if (targetCell.data && targetCell.data.currentHp <= 0) {
+            markThreatMapsDirty();
+          }
 
           if (targetCell.data && targetCell.data.currentHp <= 0) {
+            // Враг побежден
             targetCell.isAnimating = true;
             play({
               target: targetCell,
@@ -494,10 +515,17 @@ function processPlayerMove(targetX, targetY) {
                 'visual.alpha': 0 
               },
               duration: 700,
-              onComplete: () => {}
+              onComplete: () => {
+                targetCell.type = OBJECT_TYPES.EMPTY;
+                targetCell.data = null;
+                // Завершаем ход после победы над врагом
+                if (runState.levelPhase === 'dungeon') {
+                  finalizeTurnAfterMove(targetY);
+                }
+              }
             });
-            continuePlayerTurnAfterInteraction(previousY, previousX, targetY);
           } else {
+            // Игрок проиграл бой
             play({
               target: targetCell,
               props: { 'visual.y': targetCell.visual.y + 10 },
@@ -548,18 +576,19 @@ function processPlayerMove(targetX, targetY) {
       player.hasShotOnCurrentRow = false;
 
       if (runState.levelPhase === 'dungeon') {
-        const rowPlayerLeft = previousY;
-        const colPlayerLeft = previousX;
         console.log(`[DUNGEON] Processing dungeon phase, targetCell.type=${targetCell.type}`);
+        // Для всех типов клеток кроме врага завершаем ход сразу
+        // Для врага ход завершится в обработчике боя
         if (targetCell.type !== OBJECT_TYPES.ENEMY) {
-          continuePlayerTurnAfterInteraction(rowPlayerLeft, colPlayerLeft, targetY);
+          finalizeTurnAfterMove(targetY);
         } else {
-          console.log('[DUNGEON] Enemy combat, turn already handled');
+          console.log('[DUNGEON] Enemy combat in progress, turn will be finalized after combat');
         }
       }
       
       updateTutorial();
-    }
+      }
+    });
   });
 }
 
@@ -589,6 +618,12 @@ function processPlayerShot(targetCell) {
         duration: 100,
         onComplete: () => {
           dealDamageToEnemy(targetCell, actualDamage, false);
+          
+          // Сразу после нанесения урона обновляем карты угроз
+          if (enemy && enemy.currentHp <= 0) {
+            markThreatMapsDirty();
+          }
+          
           createFloatingText(`-${actualDamage}`, '#ef4444', targetCell.visual);
 
           if (enemy && enemy.currentHp <= 0) {
@@ -651,31 +686,24 @@ function processPlayerShotOnBoss(bossCell) {
   });
 }
 
-function continuePlayerTurnAfterInteraction(previousPlayerY, previousPlayerX, targetY) {
+function finalizeTurnAfterMove(targetY) {
   const { runState } = getGameState();
   const { rows } = runState;
-  console.log(`[CONTINUE_TURN] Starting, previousY=${previousPlayerY}, previousX=${previousPlayerX}, targetY=${targetY}`);
+  console.log(`[FINALIZE_TURN] Finalizing turn after move to row ${targetY}`);
   
-  processEnemyTurns(previousPlayerY, { x: previousPlayerX, y: previousPlayerY }, () => {
-    console.log(`[CONTINUE_TURN] Enemy turns completed, player HP: ${runState.player.hp}`);
-    
-    if (runState.levelPhase === 'dungeon') {
-      runState.targetScrollY = getRowY(targetY, runState.totalRows);
-    }
-    cleanupDeadEnemies(rows);
+  if (runState.levelPhase === 'dungeon') {
+    runState.targetScrollY = getRowY(targetY, runState.totalRows);
+  }
+  cleanupDeadEnemies(rows);
+  
+  // Обновляем карты угроз после перемещения игрока
+  markThreatMapsDirty();
 
-    if (runState.player.hp <= 0) {
-      console.log("[CONTINUE_TURN] Player has been defeated. Switching to summary screen.");
-      _deathType = 'damage';
-      setAppState(AppState.RUN_SUMMARY, _onStateChange);
-    } else {
-      console.log('[TURN] Returning turn to player');
-      runState.turnOwner = 'player';
-      
-      // Проверяем, не застрял ли игрок
-      checkIfPlayerStuck();
-    }
-  });
+  console.log('[TURN] Returning turn to player');
+  runState.turnOwner = 'player';
+  
+  // Проверяем, не застрял ли игрок
+  checkIfPlayerStuck();
 }
 
 function createFloatingText(text, color, position) {

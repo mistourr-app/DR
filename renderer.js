@@ -10,6 +10,19 @@ let ctx;
 const CARD_PADDING = 6;
 const ENERGY_COLOR = CELL_DEFS[OBJECT_TYPES.ENERGY].color; // Цвет энергии из registry
 
+function getRowY(y, totalRows) {
+  const regularRows = totalRows - 2;
+  if (y < regularRows) {
+    return y * DIMS.CELL_SIZE;
+  }
+  return (regularRows * DIMS.CELL_SIZE) + ((y - regularRows) * DIMS.CELL_SIZE * 2);
+}
+
+function getCellHeight(y, totalRows) {
+  const isArenaRow = y >= totalRows - 2;
+  return isArenaRow ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
+}
+
 export function initRenderer(canvasContext) {
   ctx = canvasContext;
 }
@@ -49,9 +62,15 @@ export function renderRun() {
   for (let y = firstVisibleRow; y <= lastVisibleRow; y++) {
     for (let x = 0; x < DIMS.COLS; x++) {
       const cell = rows[y][x];
-      const isArenaRow = y >= runState.totalRows - 2;
-      const cellHeight = isArenaRow ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
-      const drawY = ctx.canvas.height - (cell.visual.y - scrollY) - cellHeight;
+      const cellHeight = getCellHeight(y, runState.totalRows);
+      
+      // Координаты для фона клетки (статичные, по сетке)
+      const cellY = ctx.canvas.height - (getRowY(y, runState.totalRows) - scrollY) - cellHeight;
+      
+      // Координаты для содержимого - используем те же координаты что и фон + анимационное смещение
+      const animOffsetY = (cell.visual.y - getRowY(y, runState.totalRows)) || 0;
+      const drawY = cellY - animOffsetY;
+      
       const isPassed = y < playerRow;
       const isInRange = y < playerRow + DIMS.VISIBLE_ROWS;
       const isVisible = isInRange && !losBlockedCols[x];
@@ -60,7 +79,19 @@ export function renderRun() {
       // Это позволяет дорисовывать анимации, даже если объект ушел за пределы экрана.
       if (!isInRange && !cell.isAnimating) continue;
 
-      cellsToDraw.push({ x: x * DIMS.CELL_SIZE, y: drawY, cell, gx: x, gy: y, isVisible, isPassed, isInRange, idleThreatMap, alertThreatMap });
+      cellsToDraw.push({ 
+        x: x * DIMS.CELL_SIZE, 
+        cellY: cellY,  // для фона
+        drawY: drawY,  // для содержимого
+        cell, 
+        gx: x, 
+        gy: y, 
+        isVisible, 
+        isPassed, 
+        isInRange, 
+        idleThreatMap, 
+        alertThreatMap 
+      });
 
       if (isVisible && y > playerRow && cell.type === OBJECT_TYPES.WALL) {
         losBlockedCols[x] = true;
@@ -68,58 +99,68 @@ export function renderRun() {
     }
   }
 
-  // Pass 2: Отрисовываем сначала статические, потом анимируемые клетки
-  // Статические
-  cellsToDraw
-    .filter(c => !c.cell.isAnimating)
-    .forEach(c => drawCard(c.x, c.y, c.cell, c.gx, c.gy, c.isVisible, c.isPassed, c.isInRange, c.idleThreatMap, c.alertThreatMap));
+  // Pass 2: Отрисовываем фоны ВСЕХ клеток (статичный слой)
+  cellsToDraw.forEach(c => drawCellBackground(c.x, c.cellY, c.gx, c.gy));
+
+  // Pass 3: Отрисовываем слой подсветки угроз ПОВЕРХ фонов
+  cellsToDraw.forEach(c => drawThreatHighlight(c.x, c.cellY, c.gx, c.gy, c.idleThreatMap, c.alertThreatMap));
+
+  // Pass 4: Отрисовываем содержимое всех клеток (рамки, предметы, враги)
+  cellsToDraw.forEach(c => drawCellContent(c.x, c.drawY, c.cell, c.gx, c.gy, c.isVisible, c.isPassed, c.isInRange));
 
   // Отрисовка тактических элементов (линия выстрела)
   renderTacticalElements(scrollY);
 
   // Отрисовка игрока (всегда, даже если HP <= 0)
-  const playerDrawY = ctx.canvas.height - (player.visual.y - scrollY) - player.visual.h;
-  drawPlayerCard(player.visual.x, playerDrawY);
+  const playerCellHeight = getCellHeight(player.pos.y, runState.totalRows);
+  const playerCellY = ctx.canvas.height - (getRowY(player.pos.y, runState.totalRows) - scrollY) - playerCellHeight;
+  const playerAnimOffsetY = (player.visual.y - getRowY(player.pos.y, runState.totalRows)) || 0;
+  const playerDrawY = playerCellY - playerAnimOffsetY;
+  const playerAnimOffsetX = (player.visual.x - player.pos.x * DIMS.CELL_SIZE) || 0;
+  const playerDrawX = player.pos.x * DIMS.CELL_SIZE + playerAnimOffsetX;
+  drawPlayerCard(playerDrawX, playerDrawY);
 
   // Pass 3: Отрисовываем всплывающий текст поверх всего
   renderFloatingTexts(scrollY);
 
   // Pass 4: Отрисовываем подсказки tutorial
   renderTutorialHint();
-
-  // Анимируемые (поверх всего)
-  cellsToDraw
-    .filter(c => c.cell.isAnimating)
-    .forEach(c => drawCard(c.x, c.y, c.cell, c.gx, c.gy, c.isVisible, c.isPassed, c.isInRange, c.idleThreatMap, c.alertThreatMap));
 }
 
-function drawCard(x, y, cell, gx, gy, isVisible, isPassed, isInRange, idleThreatMap, alertThreatMap) {
+function drawCellBackground(x, y, gx, gy) {
+  const { totalRows } = getGameState().runState;
+  const pad = CARD_PADDING;
+  const w = DIMS.CELL_SIZE - pad * 2;
+  const h = getCellHeight(gy, totalRows) - pad * 2;
+
+  ctx.save();
+  ctx.translate(x + pad, y + pad);
+
+  // Единый фон для всех клеток
+  ctx.fillStyle = "#1a1d28"; // Чуть светлее базового фона
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, 8);
+  ctx.fill();
+
+  // Единая обводка для всех клеток
+  ctx.strokeStyle = "#2d313d";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawCellContent(x, y, cell, gx, gy, isVisible, isPassed, isInRange) {
   const { player, levelPhase, totalRows } = getGameState().runState;
   const pad = CARD_PADDING;
   const w = DIMS.CELL_SIZE - pad * 2;
-  const isArenaRow = gy >= totalRows - 2;
-  const h = (isArenaRow ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE) - pad * 2;
+  const h = getCellHeight(gy, totalRows) - pad * 2;
 
   ctx.save();
   ctx.translate(x + pad, y + pad);
 
   // Применяем прозрачность для анимации исчезновения
   ctx.globalAlpha = cell.visual.alpha;
-
-  // Фон клетки
-  ctx.fillStyle = (gy % 2 === 0) ? "#15171e" : "#12151c"; // --card-bg
-  ctx.beginPath();
-  ctx.roundRect(0, 0, w, h, 8);
-  ctx.fill();
-
-  // Подсветка угрозы (поверх фона и тумана, но под рамкой и контентом)
-  if (alertThreatMap.has(`${gx},${gy}`)) {
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.2)'; // Orange-400 с 20% прозрачностью
-    ctx.fill();
-  } else if (idleThreatMap.has(`${gx},${gy}`)) {
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.2)'; // Red-500 с 20% прозрачностью
-    ctx.fill();
-  }
 
   // Применяем "туман войны"
   if (isPassed) {
@@ -128,24 +169,17 @@ function drawCard(x, y, cell, gx, gy, isVisible, isPassed, isInRange, idleThreat
     ctx.globalAlpha *= 0.5;
   }
 
-  // Рамка. Подсвечиваем опасные клетки.
-  let strokeStyle = "#2d313d"; // --card-border (серый по умолчанию)
+  // Объекты НЕ имеют фона, только обводку (если нужно)
+  let strokeStyle = null; // По умолчанию нет обводки
   let lineWidth = 1;
-  ctx.setLineDash([]); // Сплошная линия по умолчанию
+  ctx.setLineDash([]);
 
   const isDungeonMoveTarget = levelPhase === 'dungeon' && gy === player.pos.y + 1;
-  // На арене подсвечиваем только горизонтальные ходы
-  const isArenaMoveTarget = levelPhase === 'boss_arena' && 
-                            gy === player.pos.y && 
-                            gx !== player.pos.x;
-
-  // Подсветка разрешенных клеток в tutorial
+  const isArenaMoveTarget = levelPhase === 'boss_arena' && gy === player.pos.y && gx !== player.pos.x;
   const tutorialCells = getTutorialAllowedCells();
   const isTutorialCell = tutorialCells && tutorialCells.some(c => c.x === gx && c.y === gy);
   
-  // В туториале подсвечиваем ТОЛЬКО клетки из allowedCells
   if (tutorialCells && isTutorialCell) {
-    // Проверяем, является ли это клеткой для движения или клеткой атаки
     const isMoveCell = (isDungeonMoveTarget || isArenaMoveTarget) && cell.type !== OBJECT_TYPES.WALL;
     const isAttackCell = cell.type === OBJECT_TYPES.ATTACK_CELL;
     
@@ -154,42 +188,32 @@ function drawCard(x, y, cell, gx, gy, isVisible, isPassed, isInRange, idleThreat
       const energyCost = Math.max(0, moveDistance - 1);
 
       if (player.energy >= energyCost) {
-        // Если ход платный (требует энергию), подсвечиваем цветом энергии
-        if (energyCost > 0) {
-          strokeStyle = ENERGY_COLOR; // Цвет энергии для платных ходов
-          lineWidth = 3;
-        } else {
-          strokeStyle = "#22c55e"; // Ярко-зеленый для бесплатных ходов
-          lineWidth = 3;
-        }
+        strokeStyle = energyCost > 0 ? ENERGY_COLOR : "#22c55e";
+        lineWidth = 3;
       } else {
-        strokeStyle = ENERGY_COLOR; // Цвет энергии, пунктирный если не хватает
+        strokeStyle = ENERGY_COLOR;
         lineWidth = 2;
         ctx.setLineDash([4, 4]);
       }
     }
   }
-  // В обычной игре (без туториала) подсвечиваем все возможные ходы
   else if (!tutorialCells && isVisible && (isDungeonMoveTarget || isArenaMoveTarget) && cell.type !== OBJECT_TYPES.WALL) {
-    // Логика для подсветки возможных ходов
     const moveDistance = Math.abs(gx - player.pos.x);
     const energyCost = Math.max(0, moveDistance - 1);
 
     if (energyCost === 0) {
-      strokeStyle = "#4ade80"; // Зеленый для бесплатных ходов
+      strokeStyle = "#4ade80";
       lineWidth = 2;
     } else if (player.energy >= energyCost) {
-      strokeStyle = ENERGY_COLOR; // Цвет энергии для платных ходов
+      strokeStyle = ENERGY_COLOR;
       lineWidth = 2;
     } else {
-      strokeStyle = ENERGY_COLOR; // Цвет энергии, но пунктирный, если энергии не хватает
+      strokeStyle = ENERGY_COLOR;
       ctx.setLineDash([4, 4]);
     }
   }
   else if (cell.type === OBJECT_TYPES.BOSS) {
-    // Логика для подсветки босса как цели
     const canUseCrossbow = player.inventory.ammo > 0;
-    // Атака в ближнем бою возможна, если есть бонус и игрок на соседней клетке
     const canUseMelee = player.inventory.attackBonuses.length > 0 && player.pos.x === gx;
 
     if (canUseMelee) {
@@ -198,32 +222,70 @@ function drawCard(x, y, cell, gx, gy, isVisible, isPassed, isInRange, idleThreat
     } else if (canUseCrossbow) {
       strokeStyle = CELL_DEFS[OBJECT_TYPES.AMMO].color;
       lineWidth = 2;
-    }
-    else {
-      strokeStyle = cell.data.color; // Цвет босса
+    } else {
+      strokeStyle = cell.data.color;
       lineWidth = 2;
     }
-  } else if (cell.type === OBJECT_TYPES.ENEMY) {
-    // Рамка врага его цветом (или зеленым в туториале)
+  } else if (cell.type === OBJECT_TYPES.ENEMY && cell.data) {
     strokeStyle = isTutorialCell ? "#22c55e" : cell.data.color;
     lineWidth = isTutorialCell ? 3 : 1;
+  } else if (cell.type === OBJECT_TYPES.WALL) {
+    // Стены имеют обводку
+    strokeStyle = CELL_DEFS[OBJECT_TYPES.WALL].color;
+    lineWidth = 1;
   }
 
-  ctx.strokeStyle = strokeStyle;
-  ctx.lineWidth = lineWidth;
-  ctx.stroke();
+  // Рисуем обводку только если она нужна
+  if (strokeStyle) {
+    ctx.beginPath();
+    ctx.roundRect(0, 0, w, h, 8);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
 
-  // Отрисовка содержимого, если клетка не пустая
-  // Босс всегда видим в арене, независимо от isInRange
+  // Отрисовка содержимого
   const isBossCell = cell.type === OBJECT_TYPES.BOSS;
   if (cell.type !== OBJECT_TYPES.EMPTY && (isVisible || isBossCell) && (isInRange || isBossCell)) {
     renderContent(cell, w, h);
   } else if (!isPassed && (!isVisible || !isInRange) && !cell.isAnimating && !isBossCell) {
-    // Вместо "?" рисуем простую тень для скрытых клеток
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    // Тень для скрытых клеток (сильнее затемнение)
+    ctx.fillStyle = "rgba(0,0,0,0.8)";
+    ctx.beginPath();
+    ctx.roundRect(0, 0, w, h, 8);
     ctx.fill();
   }
 
+  ctx.restore();
+}
+
+function drawThreatHighlight(x, y, gx, gy, idleThreatMap, alertThreatMap) {
+  const { totalRows } = getGameState().runState;
+  const pad = CARD_PADDING;
+  const w = DIMS.CELL_SIZE - pad * 2;
+  const h = getCellHeight(gy, totalRows) - pad * 2;
+
+  // Проверяем, есть ли подсветка для этой клетки
+  const hasAlert = alertThreatMap.has(`${gx},${gy}`);
+  const hasIdle = idleThreatMap.has(`${gx},${gy}`);
+  
+  if (!hasAlert && !hasIdle) return;
+
+  ctx.save();
+  ctx.translate(x + pad, y + pad);
+
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, 8);
+
+  // Подсветка с 15% прозрачностью, может наслаиваться
+  // Приоритет: оранжевая (alert) > красная (idle)
+  if (hasAlert) {
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.15)'; // Orange-400 с 15% прозрачностью
+  } else {
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)'; // Red-500 с 15% прозрачностью
+  }
+  
+  ctx.fill();
   ctx.restore();
 }
 

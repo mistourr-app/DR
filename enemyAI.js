@@ -52,34 +52,55 @@ export function getThreatMaps(rows, playerPos) {
     return cachedThreatMaps;
   }
 
-  const idleThreatMap = new Set();
-  const alertThreatMap = new Set();
+  // Map<cellKey, Set<enemyId>> - для каждой клетки храним список врагов, которые её видят
+  const idleThreatCells = new Map(); // Враги, которые НЕ видят игрока
+  const alertThreatCells = new Map(); // Враги, которые ВИДЯТ игрока
 
   for (let y = 0; y < rows.length; y++) {
     for (let x = 0; x < DIMS.COLS; x++) {
       const cell = rows[y][x];
-      if (cell.type !== OBJECT_TYPES.ENEMY || !cell.data) continue;
+      // Пропускаем мёртвых врагов
+      if (cell.type !== OBJECT_TYPES.ENEMY || !cell.data || cell.data.currentHp <= 0) continue;
 
       const enemy = cell.data;
+      const enemyId = `${x},${y}`;
       const isAlert = canEnemySeePlayer(enemy, x, y, playerPos, rows);
-      const targetMap = isAlert ? alertThreatMap : idleThreatMap;
+      const targetMap = isAlert ? alertThreatCells : idleThreatCells;
 
-      targetMap.add(`${x},${y}`);
+      // Добавляем клетку самого врага
+      const cellKey = `${x},${y}`;
+      if (!targetMap.has(cellKey)) targetMap.set(cellKey, new Set());
+      targetMap.get(cellKey).add(enemyId);
 
+      // Добавляем клетки влево от врага
       for (let i = 1; i <= enemy.visionRange; i++) {
         const checkX = x - i;
         if (checkX < 0) break;
-        if (rows[y][checkX].type === OBJECT_TYPES.WALL) break;
-        targetMap.add(`${checkX},${y}`);
+        const checkCell = rows[y][checkX];
+        if (checkCell.type === OBJECT_TYPES.WALL) break;
+        // Добавляем ВСЕ клетки, не только с врагами
+        const key = `${checkX},${y}`;
+        if (!targetMap.has(key)) targetMap.set(key, new Set());
+        targetMap.get(key).add(enemyId);
       }
+      
+      // Добавляем клетки вправо от врага
       for (let i = 1; i <= enemy.visionRange; i++) {
         const checkX = x + i;
         if (checkX >= DIMS.COLS) break;
-        if (rows[y][checkX].type === OBJECT_TYPES.WALL) break;
-        targetMap.add(`${checkX},${y}`);
+        const checkCell = rows[y][checkX];
+        if (checkCell.type === OBJECT_TYPES.WALL) break;
+        // Добавляем ВСЕ клетки, не только с врагами
+        const key = `${checkX},${y}`;
+        if (!targetMap.has(key)) targetMap.set(key, new Set());
+        targetMap.get(key).add(enemyId);
       }
     }
   }
+
+  // Конвертируем Map в Set для обратной совместимости с renderer
+  const idleThreatMap = new Set(idleThreatCells.keys());
+  const alertThreatMap = new Set(alertThreatCells.keys());
 
   cachedThreatMaps = { idleThreatMap, alertThreatMap };
   threatMapsDirty = false;
