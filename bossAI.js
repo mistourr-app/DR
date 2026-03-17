@@ -103,6 +103,8 @@ export function processBossTurn() {
       const { type: newType, data: newData } = generateArenaObject(bossCell.visual.x / DIMS.CELL_SIZE, boss.pos.y, runState.totalRows, random2, bossHpPercent);
       bossCell.type = newType;
       bossCell.data = newData;
+      bossCell.visual.alpha = 1.0;
+      bossCell.isAnimating = false;
 
       targetCell.type = OBJECT_TYPES.BOSS;
       targetCell.data = boss;
@@ -117,7 +119,10 @@ export function processBossTurn() {
             target: targetCell,
             props: { 'visual.alpha': 0 },
             duration: 300,
-            onComplete: () => {}
+            onComplete: () => {
+              targetCell.visual.alpha = 1.0;
+              targetCell.isAnimating = false;
+            }
           });
         }
       } else if (landedCellType === OBJECT_TYPES.DEFENSE_BONUS) {
@@ -129,7 +134,10 @@ export function processBossTurn() {
             target: targetCell,
             props: { 'visual.alpha': 0 },
             duration: 300,
-            onComplete: () => {}
+            onComplete: () => {
+              targetCell.visual.alpha = 1.0;
+              targetCell.isAnimating = false;
+            }
           });
         }
       } else if (landedCellType === OBJECT_TYPES.HEAL) {

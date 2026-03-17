@@ -332,6 +332,8 @@ function processPlayerMove(targetX, targetY) {
       const playerHpPercent = player.hp / player.maxHp;
       const { type: newType, data: newData } = generateArenaObject(player.pos.x, player.pos.y, runState.totalRows, random, playerHpPercent);
       previousCell.type = newType; previousCell.data = newData;
+      previousCell.visual.alpha = 1.0;
+      previousCell.isAnimating = false;
     }
   }
 
@@ -439,7 +441,10 @@ function processPlayerMove(targetX, targetY) {
               target: targetCell,
               props: { 'visual.alpha': 0 },
               duration: 300,
-              onComplete: () => {}
+              onComplete: () => {
+                targetCell.visual.alpha = 1.0;
+                targetCell.isAnimating = false;
+              }
             });
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
@@ -458,7 +463,10 @@ function processPlayerMove(targetX, targetY) {
               target: targetCell,
               props: { 'visual.alpha': 0 },
               duration: 300,
-              onComplete: () => {}
+              onComplete: () => {
+                targetCell.visual.alpha = 1.0;
+                targetCell.isAnimating = false;
+              }
             });
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
