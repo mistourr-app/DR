@@ -3,7 +3,7 @@ import { OBJECT_TYPES, CELL_DEFS } from './registry.js';
 import { DIMS } from './config.js';
 import { dealDamageToPlayer } from './combat.js';
 import { play } from './animation.js';
-import { createPRNG, generateArenaObject } from './utils.js';
+import { createPRNG, generateArenaObject, spawnArenaObject } from './utils.js';
 import { updateTutorial } from './tutorial.js';
 
 export function processBossTurn() {
@@ -86,27 +86,35 @@ export function processBossTurn() {
 
   const targetCell = rows[boss.pos.y][targetX];
   const bossCell = rows[boss.pos.y][boss.pos.x];
-  
+  const oldBossX = boss.pos.x;
+
   play({
-    target: bossCell.visual,
-    props: { x: targetX * DIMS.CELL_SIZE },
+    target: boss,
+    props: { 'visual.x': targetX * DIMS.CELL_SIZE },
     duration: 200,
     onComplete: () => {
-      boss.pos.x = targetX;
-      if (boss) boss.lastMoveX = targetX;
-
       const landedCellType = targetCell.type;
       const landedCellData = targetCell.data;
 
-      const random2 = createPRNG(runState.seed + bossCell.visual.x * bossCell.visual.y + runState.boss.currentHp);
-      const bossHpPercent = boss.currentHp / boss.hp;
-      const { type: newType, data: newData } = generateArenaObject(bossCell.visual.x / DIMS.CELL_SIZE, boss.pos.y, runState.totalRows, random2, bossHpPercent);
-      bossCell.type = newType;
-      bossCell.data = newData;
+      console.log(`[BOSS_MOVE] from x=${oldBossX} to x=${targetX}, landedOn=${landedCellType}`);
+      console.log(`[BOSS_CELL] bossCell(${oldBossX}) type=${bossCell.type}`);
 
-      targetCell.type = OBJECT_TYPES.BOSS;
-      targetCell.data = boss;
-      targetCell.visual.x = targetX * DIMS.CELL_SIZE;
+      // Сбрасываем visual старой клетки на своё место
+      bossCell.visual.x = oldBossX * DIMS.CELL_SIZE;
+
+      // Босс перемещается на новую позицию
+      boss.pos.x = targetX;
+      if (boss) boss.lastMoveX = targetX;
+
+      // Очищаем клетку куда пришёл босс — объект использован
+      targetCell.type = OBJECT_TYPES.EMPTY;
+      targetCell.data = null;
+
+      // Генерируем объект на старой позиции босса
+      spawnArenaObject(bossCell, oldBossX, boss.pos.y, runState.totalRows, boss.currentHp / boss.hp);
+      console.log(`[BOSS_CELL_AFTER] bossCell(${oldBossX}) type=${bossCell.type}`);
+
+      console.log(`[BOSS_PICKUP] landedCellType=${landedCellType}, landedCellData=`, landedCellData, 'boss inv:', boss.inventory);
 
       if (landedCellType === OBJECT_TYPES.ATTACK_BONUS) {
         if (boss.inventory.attackBonuses.length < 2) {

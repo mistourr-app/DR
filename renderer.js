@@ -49,9 +49,13 @@ export function renderRun() {
 
   // --- Оконный рендер ---
   // Определяем, какие ряды видимы в данный момент
-  const firstVisibleRow = Math.max(0, Math.floor(scrollY / DIMS.CELL_SIZE) - 1);
+  const arenaStartRow = runState.totalRows - 2;
+  const firstVisibleRow = Math.max(0, Math.min(Math.floor(scrollY / DIMS.CELL_SIZE) - 1, arenaStartRow));
   const lastVisibleRow = Math.min(rows.length - 1, firstVisibleRow + DIMS.VISIBLE_ROWS + 3);
   const playerRow = player.pos.y;
+
+  // Включаем ряды арены босса всегда, даже если камера далеко
+  const effectiveLastRow = Math.max(lastVisibleRow, arenaStartRow);
 
   // --- Карта угроз (кэшированная) ---
   const { idleThreatMap, alertThreatMap } = getThreatMaps(rows, player.pos);
@@ -59,7 +63,7 @@ export function renderRun() {
   // --- Новый двухпроходный рендер ---
   // Pass 1: Собираем информацию обо всех видимых клетках
   const cellsToDraw = [];
-  for (let y = firstVisibleRow; y <= lastVisibleRow; y++) {
+  for (let y = firstVisibleRow; y <= effectiveLastRow; y++) {
     for (let x = 0; x < DIMS.COLS; x++) {
       const cell = rows[y][x];
       const cellHeight = getCellHeight(y, runState.totalRows);
@@ -74,10 +78,17 @@ export function renderRun() {
       const isPassed = y < playerRow;
       const isInRange = y < playerRow + DIMS.VISIBLE_ROWS;
       const isVisible = isInRange && !losBlockedCols[x];
-      
+
       // Пропускаем отрисовку только тех клеток, которые невидимы И не анимируются.
       // Это позволяет дорисовывать анимации, даже если объект ушел за пределы экрана.
-      if (!isInRange && !cell.isAnimating) continue;
+      // Босс и клетки арены рисуются всегда, независимо от дальности.
+      const isArenaCell = y >= arenaStartRow;
+      if (!isInRange && !cell.isAnimating && !isArenaCell) continue;
+
+      // Для босса и клеток арены принудительно включаем isInRange
+      const cellIsInRange = isArenaCell ? true : isInRange;
+      const cellIsVisible = isArenaCell ? true : isVisible;
+      const cellIsPassed = isArenaCell ? false : isPassed;
 
       cellsToDraw.push({
         x: x * DIMS.CELL_SIZE,
@@ -87,9 +98,9 @@ export function renderRun() {
         cell,
         gx: x,
         gy: y,
-        isVisible,
-        isPassed,
-        isInRange,
+        isVisible: cellIsVisible,
+        isPassed: cellIsPassed,
+        isInRange: cellIsInRange,
         idleThreatMap, 
         alertThreatMap 
       });
@@ -107,7 +118,12 @@ export function renderRun() {
   cellsToDraw.forEach(c => drawThreatHighlight(c.x, c.cellY, c.gx, c.gy, c.idleThreatMap, c.alertThreatMap));
 
   // Pass 4: Отрисовываем содержимое всех клеток (рамки, предметы, враги)
-  cellsToDraw.forEach(c => drawCellContent(c.cellX, c.drawY, c.cell, c.gx, c.gy, c.isVisible, c.isPassed, c.isInRange));
+  // Босс рисуется отдельно через drawBossCard, пропускаем его в цикле
+  cellsToDraw.forEach(c => {
+    if (c.cell.type !== OBJECT_TYPES.BOSS) {
+      drawCellContent(c.cellX, c.drawY, c.cell, c.gx, c.gy, c.isVisible, c.isPassed, c.isInRange);
+    }
+  });
 
   // Отрисовка тактических элементов (линия выстрела)
   renderTacticalElements(scrollY);
@@ -120,6 +136,18 @@ export function renderRun() {
   const playerAnimOffsetX = (player.visual.x - player.pos.x * DIMS.CELL_SIZE) || 0;
   const playerDrawX = player.pos.x * DIMS.CELL_SIZE + playerAnimOffsetX;
   drawPlayerCard(playerDrawX, playerDrawY);
+
+  // Отрисовка босса (всегда, если жив и фаза арены)
+  if (runState.levelPhase === 'boss_arena' && runState.boss && runState.boss.currentHp > 0) {
+    const boss = runState.boss;
+    const bossPos = boss.pos;
+    const bossCellHeight = getCellHeight(bossPos.y, runState.totalRows);
+    const bossGridY = getRowY(bossPos.y, runState.totalRows);
+    const bossCellY = ctx.canvas.height - (bossGridY - scrollY) - bossCellHeight;
+    const bossDrawX = boss.visual ? boss.visual.x : bossPos.x * DIMS.CELL_SIZE;
+    const bossDrawY = bossCellY;
+    drawBossCard(bossDrawX, bossDrawY);
+  }
 
   // Pass 3: Отрисовываем всплывающий текст поверх всего
   renderFloatingTexts(scrollY);
@@ -543,6 +571,43 @@ function drawPlayerCard(x, y) {
   ctx.fillStyle = energyColor;
   ctx.font = `bold ${Math.round(8 * fontScale)}px Inter, sans-serif`;
   ctx.fillText(`Э: ${player.energy}/${player.maxEnergy}`, w / 2, h - (6 * fontScale));
+
+  ctx.restore();
+}
+
+function drawBossCard(x, y) {
+  const { boss } = getGameState().runState;
+  if (!boss || boss.currentHp <= 0) return;
+
+  const fontScale = DIMS.CELL_SIZE / 64;
+  const pad = CARD_PADDING;
+  const w = DIMS.CELL_SIZE - pad * 2;
+  const h = DIMS.CELL_SIZE * 2 - pad * 2; // Босс занимает двойную высоту
+
+  ctx.save();
+  ctx.translate(x + pad, y + pad);
+
+  // Непрозрачная карточка босса — всегда виден
+  ctx.globalAlpha = 1.0;
+
+  // Фон
+  ctx.fillStyle = "#272b38";
+  ctx.strokeStyle = boss.color || '#FF58F4';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, 12);
+  ctx.fill();
+  ctx.stroke();
+
+  // Текст
+  ctx.textAlign = "center";
+  ctx.fillStyle = boss.color || '#FF58F4';
+  ctx.font = `bold ${Math.round(10 * fontScale)}px Inter, sans-serif`;
+  ctx.fillText(boss.label || 'БОСС', w / 2, 20 * fontScale);
+
+  // HP Босса
+  ctx.font = `900 ${Math.round(18 * fontScale)}px Inter, sans-serif`;
+  ctx.fillText(boss.currentHp, w / 2, h / 2 + (10 * fontScale));
 
   ctx.restore();
 }

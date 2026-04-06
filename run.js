@@ -6,7 +6,7 @@ import { Events, emit, clear as clearEvents } from './events.js';
 import { dealDamageToEnemy, dealDamageToBoss, processMeleeCombat, dealDamageToPlayer, initCombat, processPlayerMeleeOnBoss, calculateAndConsumeAttackBonuses } from './combat.js';
 import { cleanupDeadEnemies, processEnemyTurns, markThreatMapsDirty } from './enemyAI.js';
 import { processBossTurn } from './bossAI.js';
-import { createPRNG, generateArenaObject } from './utils.js';
+import { createPRNG, generateArenaObject, spawnArenaObject } from './utils.js';
 import { startTutorial, stopTutorial, updateTutorial, isClickAllowed } from './tutorial.js';
 
 let _onStateChange = () => {};
@@ -191,13 +191,14 @@ export function startRun(levelId) {
 
   const bossX = 2;
   const bossY = levelData.rows - 1;
-  const bossCell = initialRows[bossY][bossX];
-  bossCell.type = OBJECT_TYPES.BOSS;
-  bossCell.data = bossData;
+  // Стартовая клетка босса должна быть пустой — объект генерируется при первом ходе
+  initialRows[bossY][bossX].type = OBJECT_TYPES.EMPTY;
+  initialRows[bossY][bossX].data = null;
 
   const boss = {
     ...bossData,
     pos: { x: bossX, y: bossY },
+    visual: { x: bossX * DIMS.CELL_SIZE },
     inventory: {
       attackBonuses: [],
       defenseBonuses: [],
@@ -331,16 +332,6 @@ function processPlayerMove(targetX, targetY) {
     emit(Events.PHASE_CHANGED, { phase: 'boss_arena' });
   }
 
-  if (runState.levelPhase === 'boss_arena') {
-    const previousCell = rows[player.pos.y][player.pos.x];
-    if (previousCell.type === OBJECT_TYPES.EMPTY) {
-      const random = createPRNG(runState.seed + player.pos.x * player.pos.y + runState.player.hp);
-      const playerHpPercent = player.hp / player.maxHp;
-      const { type: newType, data: newData } = generateArenaObject(player.pos.x, player.pos.y, runState.totalRows, random, playerHpPercent);
-      previousCell.type = newType; previousCell.data = newData;
-    }
-  }
-
   if (targetY >= runState.totalRows - 2) {
     runState.targetScrollY = getRowY(runState.totalRows - 2, runState.totalRows);
   }
@@ -399,6 +390,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
           break;
         }
         case OBJECT_TYPES.AMMO: {
@@ -411,6 +403,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
           break;
         }
         case OBJECT_TYPES.ENERGY: {
@@ -423,6 +416,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
           break;
         }
         case OBJECT_TYPES.GOLD: {
@@ -431,6 +425,7 @@ function processPlayerMove(targetX, targetY) {
           createFloatingText(`+${goldAmount} з.`, CELL_DEFS[OBJECT_TYPES.GOLD].color, player.visual);
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
           break;
         }
         case OBJECT_TYPES.ATTACK_BONUS: {
@@ -450,6 +445,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
           break;
         }
         case OBJECT_TYPES.DEFENSE_BONUS: {
@@ -469,14 +465,18 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
           break;
         }
         case OBJECT_TYPES.ATTACK_CELL: {
           const cellDamage = targetCell.data.value;
           
-          // Используем универсальную функцию с учетом защиты босса
           const actualDamage = calculateAndConsumeAttackBonuses(cellDamage, runState.boss.currentHp, runState.boss.inventory.defenseBonuses);
           
+          targetCell.type = OBJECT_TYPES.EMPTY;
+          targetCell.data = null;
+          spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
+
           const originalY = player.visual.y;
           play({
             target: player,
@@ -499,8 +499,6 @@ function processPlayerMove(targetX, targetY) {
               });
             }
           });
-          targetCell.type = OBJECT_TYPES.EMPTY;
-          targetCell.data = null;
           break;
         }
         case OBJECT_TYPES.ENEMY: {

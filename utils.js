@@ -64,3 +64,15 @@ export function generateArenaObject(x, y, totalRows, random, hpPercent = 1.0) {
   const maxDamage = 10;
   return { type: fallbackType, data: { value: Math.floor(random() * (maxDamage - minDamage + 1)) + minDamage } };
 }
+
+// Заполняет пустую клетку арены новым объектом
+export function spawnArenaObject(cell, x, y, totalRows, hpPercent = 1.0) {
+  const prevType = cell.type;
+  const random = createPRNG(Date.now() + x * 1000 + y);
+  const { type, data } = generateArenaObject(x, y, totalRows, random, hpPercent);
+  cell.type = type;
+  cell.data = data;
+  cell.visual.alpha = 1.0;
+  cell.isAnimating = false;
+  console.log(`[SPAWN] (${x},${y}) ${prevType} → ${type}`, data);
+}
