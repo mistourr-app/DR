@@ -76,8 +76,8 @@ export function renderRun() {
       const isVisible = isInRange && !losBlockedCols[x];
       
       // Пропускаем отрисовку только тех клеток, которые невидимы И не анимируются.
-      // Босса никогда не пропускаем - он всегда должен быть виден во время битвы.
-      if (!isInRange && !cell.isAnimating && cell.type !== OBJECT_TYPES.BOSS) continue;
+      // Это позволяет дорисовывать анимации, даже если объект ушел за пределы экрана.
+      if (!isInRange && !cell.isAnimating) continue;
 
       cellsToDraw.push({ 
         x: x * DIMS.CELL_SIZE, 
