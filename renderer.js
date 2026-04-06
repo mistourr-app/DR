@@ -79,16 +79,17 @@ export function renderRun() {
       // Это позволяет дорисовывать анимации, даже если объект ушел за пределы экрана.
       if (!isInRange && !cell.isAnimating) continue;
 
-      cellsToDraw.push({ 
-        x: x * DIMS.CELL_SIZE, 
+      cellsToDraw.push({
+        x: x * DIMS.CELL_SIZE,
+        cellX: cell.visual.x || (x * DIMS.CELL_SIZE),
         cellY: cellY,  // для фона
         drawY: drawY,  // для содержимого
-        cell, 
-        gx: x, 
-        gy: y, 
-        isVisible, 
-        isPassed, 
-        isInRange, 
+        cell,
+        gx: x,
+        gy: y,
+        isVisible,
+        isPassed,
+        isInRange,
         idleThreatMap, 
         alertThreatMap 
       });
@@ -106,7 +107,7 @@ export function renderRun() {
   cellsToDraw.forEach(c => drawThreatHighlight(c.x, c.cellY, c.gx, c.gy, c.idleThreatMap, c.alertThreatMap));
 
   // Pass 4: Отрисовываем содержимое всех клеток (рамки, предметы, враги)
-  cellsToDraw.forEach(c => drawCellContent(c.x, c.drawY, c.cell, c.gx, c.gy, c.isVisible, c.isPassed, c.isInRange));
+  cellsToDraw.forEach(c => drawCellContent(c.cellX, c.drawY, c.cell, c.gx, c.gy, c.isVisible, c.isPassed, c.isInRange));
 
   // Отрисовка тактических элементов (линия выстрела)
   renderTacticalElements(scrollY);

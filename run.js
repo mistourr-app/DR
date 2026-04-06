@@ -279,7 +279,13 @@ export function processPlayerAction(gx, gy) {
         processPlayerShot(targetCellForShot);
       }
     } else if (gy === player.pos.y + 1 && gy < rows.length) {
-      processPlayerMove(gx, gy);
+      const targetCellForMove = rows[gy]?.[gx];
+      // Если на целевой клетке враг — это ближний бой
+      if (targetCellForMove?.type === OBJECT_TYPES.ENEMY) {
+        processMeleeAttack(gx, gy);
+      } else {
+        processPlayerMove(gx, gy);
+      }
     }
   } else {
     const targetCell = rows[gy]?.[gx];
@@ -498,43 +504,68 @@ function processPlayerMove(targetX, targetY) {
           break;
         }
         case OBJECT_TYPES.ENEMY: {
-          const didPlayerWin = processMeleeCombat(targetCell);
-          
-          // Сразу после боя обновляем карты угроз, если враг мертв
-          if (targetCell.data && targetCell.data.currentHp <= 0) {
-            markThreatMapsDirty();
-          }
+          // Анимация выпадa игрока к врагу
+          const playerLungeX = player.visual.x + ((gx - player.pos.x) * DIMS.CELL_SIZE * 0.3);
+          const playerLungeY = player.visual.y + DIMS.CELL_SIZE * 0.3;
 
-          if (targetCell.data && targetCell.data.currentHp <= 0) {
-            // Враг побежден
-            targetCell.isAnimating = true;
-            play({
-              target: targetCell,
-              props: { 
-                'visual.y': targetCell.visual.y - DIMS.CELL_SIZE * 1.5,
-                'visual.alpha': 0 
-              },
-              duration: 700,
-              onComplete: () => {
-                targetCell.type = OBJECT_TYPES.EMPTY;
-                targetCell.data = null;
-                // Завершаем ход после победы над врагом
-                if (runState.levelPhase === 'dungeon') {
-                  finalizeTurnAfterMove(targetY);
+          play({
+            target: player,
+            props: {
+              'visual.x': playerLungeX,
+              'visual.y': playerLungeY,
+            },
+            duration: 150,
+            onComplete: () => {
+              // Бой происходит в момент контакта
+              const didPlayerWin = processMeleeCombat(targetCell);
+
+              // Возвращаем игрока на место
+              play({
+                target: player,
+                props: {
+                  'visual.x': player.visual.x - ((gx - player.pos.x) * DIMS.CELL_SIZE * 0.3),
+                  'visual.y': player.visual.y - DIMS.CELL_SIZE * 0.3,
+                },
+                duration: 150,
+                onComplete: () => {
+                  // Сразу после боя обновляем карты угроз, если враг мертв
+                  if (targetCell.data && targetCell.data.currentHp <= 0) {
+                    markThreatMapsDirty();
+                  }
+
+                  if (targetCell.data && targetCell.data.currentHp <= 0) {
+                    // Враг побежден — анимация смерти
+                    targetCell.isAnimating = true;
+                    play({
+                      target: targetCell,
+                      props: {
+                        'visual.y': targetCell.visual.y - DIMS.CELL_SIZE * 1.5,
+                        'visual.alpha': 0
+                      },
+                      duration: 700,
+                      onComplete: () => {
+                        targetCell.type = OBJECT_TYPES.EMPTY;
+                        targetCell.data = null;
+                        if (runState.levelPhase === 'dungeon') {
+                          finalizeTurnAfterMove(targetY);
+                        }
+                      }
+                    });
+                  } else {
+                    // Игрок проиграл бой
+                    play({
+                      target: targetCell,
+                      props: { 'visual.y': targetCell.visual.y + 10 },
+                      duration: 100,
+                      onComplete: () => {
+                        setAppState(AppState.RUN_SUMMARY, _onStateChange);
+                      }
+                    });
+                  }
                 }
-              }
-            });
-          } else {
-            // Игрок проиграл бой
-            play({
-              target: targetCell,
-              props: { 'visual.y': targetCell.visual.y + 10 },
-              duration: 100,                
-              onComplete: () => {
-                setAppState(AppState.RUN_SUMMARY, _onStateChange);
-              }
-            });
-          }
+              });
+            }
+          });
           break;
         }
         default: {
@@ -712,11 +743,102 @@ function createFloatingText(text, color, position) {
     id: Date.now() + Math.random(),
     text,
     color,
-    visual: { 
-      x: position.x, 
+    visual: {
+      x: position.x,
       y: position.y + DIMS.CELL_SIZE * 0.5,
-      alpha: 1.0 
+      alpha: 1.0
     },
   };
   runState.floatingTexts.push(newText);
+}
+
+/**
+ * Отдельная функция для ближнего боя (клик на врага на следующем ряду)
+ * Игрок перемещается на клетку врага и дерётся
+ */
+function processMeleeAttack(enemyX, enemyY) {
+  const { runState } = getGameState();
+  const { player, rows } = runState;
+  const targetCell = rows[enemyY][enemyX];
+
+  console.log(`[MELEE_ATTACK] Attacking enemy at (${enemyX},${enemyY})`);
+
+  runState.turnOwner = 'processing';
+
+  // Сначала атаки врагов "в спину" с текущего ряда
+  const previousY = player.pos.y;
+
+  processEnemyTurns(previousY, { x: player.pos.x, y: previousY }, () => {
+    if (player.hp <= 0) {
+      _deathType = 'damage';
+      setAppState(AppState.RUN_SUMMARY, _onStateChange);
+      return;
+    }
+
+    // Анимация перемещения игрока к врагу
+    const targetHeight = (enemyY >= runState.totalRows - 2) ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
+
+    play({
+      target: player,
+      props: {
+        'visual.x': enemyX * DIMS.CELL_SIZE,
+        'visual.y': getRowY(enemyY, runState.totalRows),
+        'visual.h': targetHeight,
+      },
+      duration: 250,
+      onComplete: () => {
+        // Обновляем позицию игрока
+        player.pos.x = enemyX;
+        player.pos.y = enemyY;
+
+        // Анимация выпадa (короткий тычок вперёд)
+        const playerLungeY = player.visual.y - DIMS.CELL_SIZE * 0.15;
+
+        play({
+          target: player,
+          props: {
+            'visual.y': playerLungeY,
+          },
+          duration: 100,
+          onComplete: () => {
+            processMeleeCombat(targetCell);
+
+            // Возвращаем игрока на место
+            play({
+              target: player,
+              props: {
+                'visual.y': getRowY(enemyY, runState.totalRows),
+              },
+              duration: 100,
+              onComplete: () => {
+                if (targetCell.data && targetCell.data.currentHp <= 0) {
+                  markThreatMapsDirty();
+                  // Враг побеждён
+                  targetCell.isAnimating = true;
+                  play({
+                    target: targetCell,
+                    props: {
+                      'visual.y': targetCell.visual.y - DIMS.CELL_SIZE * 1.5,
+                      'visual.alpha': 0
+                    },
+                    duration: 700,
+                    onComplete: () => {
+                      targetCell.type = OBJECT_TYPES.EMPTY;
+                      targetCell.data = null;
+                      finalizeTurnAfterMove(enemyY);
+                      updateTutorial();
+                    }
+                  });
+                } else {
+                  // Игрок проиграл бой
+                  stopTutorial();
+                  setAppState(AppState.RUN_SUMMARY, _onStateChange);
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+  });
 }

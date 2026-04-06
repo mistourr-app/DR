@@ -123,7 +123,7 @@ export function processEnemyTurns(y, playerOldPos, onAllAttacksComplete) {
     if (cell.type === OBJECT_TYPES.ENEMY && cell.data) {
       if (canEnemySeePlayer(cell.data, x, y, playerOldPos, rows)) {
         console.log(`[ENEMY_TURNS] Enemy at (${x},${y}) can see player, adding to attack queue`);
-        attackingEnemies.push(cell);
+        attackingEnemies.push({ cell, x, y });
       }
     }
   }
@@ -133,33 +133,38 @@ export function processEnemyTurns(y, playerOldPos, onAllAttacksComplete) {
     onAllAttacksComplete();
     return;
   }
-  
+
   console.log(`[ENEMY_TURNS] ${attackingEnemies.length} enemies will attack`);
 
   function playNextAttack(index) {
-    const { runState } = getGameState();
-    
+    const runState = getGameState().runState;
+
     console.log(`[ENEMY_TURNS] Processing attack ${index + 1}/${attackingEnemies.length}, player HP: ${runState.player.hp}`);
-    
+
     if (index >= attackingEnemies.length) {
       console.log('[ENEMY_TURNS] All attacks completed');
       onAllAttacksComplete();
       return;
     }
-    
+
     if (runState.player.hp <= 0) {
       console.log('[ENEMY_TURNS] Player dead, stopping attacks');
       onAllAttacksComplete();
       return;
     }
 
-    const enemyCell = attackingEnemies[index];
+    const { cell: enemyCell, x: enemyX } = attackingEnemies[index];
     const enemy = enemyCell.data;
+    const originalX = enemyCell.visual.x;
     const originalY = enemyCell.visual.y;
+
+    // Определяем направление к игроку (на момент до его перемещения)
+    const directionToPlayer = Math.sign(playerOldPos.x - enemyX);
+    const lungeX = originalX + (directionToPlayer * DIMS.CELL_SIZE * 0.3);
 
     play({
       target: enemyCell,
-      props: { 'visual.y': originalY + DIMS.CELL_SIZE * 0.3 },
+      props: { 'visual.x': lungeX },
       duration: 150,
       onComplete: () => {
         const damage = dealDamageToPlayer(enemy.currentHp, enemy);
@@ -167,7 +172,7 @@ export function processEnemyTurns(y, playerOldPos, onAllAttacksComplete) {
 
         play({
           target: enemyCell,
-          props: { 'visual.y': originalY },
+          props: { 'visual.x': originalX },
           duration: 150,
           onComplete: () => playNextAttack(index + 1)
         });
