@@ -134,22 +134,8 @@ export function dealDamageToEnemy(enemyCell, baseDamage, consumeBonuses = false)
 export function dealDamageToBoss(damage) {
   const { runState } = getGameState();
   const { boss } = runState;
-  let remainingDamage = damage;
 
-  for (let i = boss.inventory.defenseBonuses.length - 1; i >= 0; i--) {
-    const bonus = boss.inventory.defenseBonuses[i];
-    const absorbedAmount = Math.min(remainingDamage, bonus.value);
-    
-    bonus.value -= absorbedAmount;
-    remainingDamage -= absorbedAmount;
-
-    if (bonus.value <= 0) {
-      boss.inventory.defenseBonuses.splice(i, 1);
-    }
-    if (remainingDamage <= 0) break;
-  }
-
-  const actualDamageToHp = Math.min(remainingDamage, boss.currentHp);
+  const actualDamageToHp = Math.min(Math.max(0, damage), boss.currentHp);
   boss.currentHp -= actualDamageToHp;
 
   emit(Events.BOSS_ATTACKED, { damage, actualDamage: actualDamageToHp });
@@ -195,8 +181,18 @@ export function processPlayerMeleeOnBoss() {
 
   runState.turnOwner = 'processing';
 
-  const damage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
+  const rawDamage = player.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
   player.inventory.attackBonuses = [];
+
+  // Учитываем защиту босса
+  let damage = rawDamage;
+  for (let i = boss.inventory.defenseBonuses.length - 1; i >= 0 && damage > 0; i--) {
+    const bonus = boss.inventory.defenseBonuses[i];
+    const absorbed = Math.min(damage, bonus.value);
+    bonus.value -= absorbed;
+    damage -= absorbed;
+    if (bonus.value <= 0) boss.inventory.defenseBonuses.splice(i, 1);
+  }
 
   dealDamageToBoss(damage);
   

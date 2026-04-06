@@ -118,9 +118,11 @@ export function renderRun() {
   cellsToDraw.forEach(c => drawThreatHighlight(c.x, c.cellY, c.gx, c.gy, c.idleThreatMap, c.alertThreatMap));
 
   // Pass 4: Отрисовываем содержимое всех клеток (рамки, предметы, враги)
-  // Босс рисуется отдельно через drawBossCard, пропускаем его в цикле
+  // Босс и клетка под ним рисуются отдельно через drawBossCard
   cellsToDraw.forEach(c => {
-    if (c.cell.type !== OBJECT_TYPES.BOSS) {
+    const isBossPos = runState.levelPhase === 'boss_arena' && runState.boss &&
+      c.gx === runState.boss.pos.x && c.gy === runState.boss.pos.y;
+    if (!isBossPos) {
       drawCellContent(c.cellX, c.drawY, c.cell, c.gx, c.gy, c.isVisible, c.isPassed, c.isInRange);
     }
   });
@@ -241,7 +243,8 @@ function drawCellContent(x, y, cell, gx, gy, isVisible, isPassed, isInRange) {
       ctx.setLineDash([4, 4]);
     }
   }
-  else if (cell.type === OBJECT_TYPES.BOSS) {
+  else if (cell.type === OBJECT_TYPES.BOSS || (levelPhase === 'boss_arena' && getGameState().runState.boss && gx === getGameState().runState.boss.pos.x && gy === getGameState().runState.boss.pos.y)) {
+    const boss = getGameState().runState.boss;
     const canUseCrossbow = player.inventory.ammo > 0;
     const canUseMelee = player.inventory.attackBonuses.length > 0 && player.pos.x === gx;
 
@@ -252,7 +255,7 @@ function drawCellContent(x, y, cell, gx, gy, isVisible, isPassed, isInRange) {
       strokeStyle = CELL_DEFS[OBJECT_TYPES.AMMO].color;
       lineWidth = 2;
     } else {
-      strokeStyle = cell.data.color;
+      strokeStyle = boss.color || '#FF58F4';
       lineWidth = 2;
     }
   } else if (cell.type === OBJECT_TYPES.ENEMY && cell.data) {

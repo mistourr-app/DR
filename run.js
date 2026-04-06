@@ -205,6 +205,7 @@ export function startRun(levelId) {
     },
     lastMoveX: null,
   };
+  const isDebugBoss = levelId === 'debug_boss';
   const startPos = { x: 2, y: 0 };
   state.runState = {
     seed: seed,
@@ -221,8 +222,8 @@ export function startRun(levelId) {
       pos: { ...startPos },
       inventory: {
         weapon: { type: 'crossbow', range: 3, damage: 3 },
-        ammo: 3,
-        maxAmmo: 3,
+        ammo: isDebugBoss ? 10 : 3,
+        maxAmmo: isDebugBoss ? 10 : 3,
         attackBonuses: [],
         defenseBonuses: [],
       },
@@ -291,13 +292,13 @@ export function processPlayerAction(gx, gy) {
   } else {
     const targetCell = rows[gy]?.[gx];
     const isMovingHorizontally = gy === player.pos.y && gx !== player.pos.x;
-    const isTargetingBoss = targetCell?.type === OBJECT_TYPES.BOSS;
+    const isTargetingBoss = gy === runState.boss.pos.y && gx === runState.boss.pos.x;
 
     if (isMovingHorizontally) {
       processPlayerMove(gx, gy);
     } else if (isTargetingBoss && !player.hasShotOnCurrentRow) {
       const distance = Math.abs(gx - player.pos.x);
-      if (player.inventory.ammo > 0 && distance > 0 && distance <= player.inventory.weapon.range) {
+      if (player.inventory.ammo > 0 && distance <= player.inventory.weapon.range) {
         processPlayerShotOnBoss(targetCell);
       }
     }
@@ -373,6 +374,15 @@ function processPlayerMove(targetX, targetY) {
       const previousX = player.pos.x;
       player.pos.x = targetX;
       player.pos.y = targetY;
+
+      // Генерируем объект на клетке откуда ушёл игрок (если арена и клетка пустая)
+      if (runState.levelPhase === 'boss_arena') {
+        const prevCell = rows[previousY][previousX];
+        console.log(`[LEAVE_CELL] (${previousX},${previousY}) type=${prevCell.type}`);
+        if (prevCell.type === OBJECT_TYPES.EMPTY) {
+          spawnArenaObject(prevCell, previousX, previousY, runState.totalRows, player.hp / player.maxHp);
+        }
+      }
       
       console.log(`[PLAYER_MOVE] Animation complete, now at (${targetX},${targetY}), interacting with ${targetCell.type}`);
 
@@ -684,28 +694,25 @@ function processPlayerShotOnBoss(bossCell) {
   const { runState } = getGameState();
   const { player, boss } = runState;
 
+  console.log(`[SHOT_BOSS] player=(${player.pos.x},${player.pos.y}) boss=(${boss.pos.x},${boss.pos.y})`);
   player.inventory.ammo--;
   player.hasShotOnCurrentRow = true;
 
   const weaponDamage = player.inventory.weapon.damage;
-  
-  // Используем универсальную функцию с учетом защиты босса
   const actualDamage = calculateAndConsumeAttackBonuses(weaponDamage, boss.currentHp, boss.inventory.defenseBonuses);
 
   play({
-    target: bossCell,
-    props: { 'visual.alpha': 0.5 },
-    duration: 100,
+    target: boss,
+    props: { 'visual.x': boss.visual.x - 6 },
+    duration: 80,
     onComplete: () => {
       play({
-        target: bossCell,
-        props: { 'visual.alpha': 1.0 },
-        duration: 100,
+        target: boss,
+        props: { 'visual.x': boss.visual.x + 6 },
+        duration: 80,
         onComplete: () => {
           dealDamageToBoss(actualDamage);
-          createFloatingText(`-${actualDamage}`, '#ef4444', bossCell.visual);
-          
-          // Возвращаем ход игроку, так как выстрел не заканчивает ход
+          createFloatingText(`-${actualDamage}`, '#ef4444', { x: boss.visual.x, y: bossCell.visual.y });
           if (runState.player.hp > 0 && runState.boss.currentHp > 0) {
             runState.turnOwner = 'player';
           }

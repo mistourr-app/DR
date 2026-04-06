@@ -176,6 +176,23 @@ export const LEVELS = [
     }
   },
   {
+    "id": "debug_boss",
+    "rows": 3,
+    "name": "[DEBUG] Арена",
+    "bossHpMultiplier": 1,
+    "isTutorial": false,
+    "chances": {
+      "ENEMY": 0,
+      "WALL": 0,
+      "HEAL": 0,
+      "AMMO": 0,
+      "ENERGY": 0,
+      "ATTACK_BONUS": 0,
+      "DEFENSE_BONUS": 0,
+      "GOLD": 0
+    }
+  },
+  {
     "id": "sector_1",
     "rows": 30,
     "name": "Сектор 1",
