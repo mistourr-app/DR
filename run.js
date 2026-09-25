@@ -181,6 +181,7 @@ export function startRun(levelId) {
           const enemyType = cellDef.enemyType || 'TYPE_1';
           data = { 
             ...ENEMY_DEFS[enemyType], 
+            artId: enemyType,
             currentHp: ENEMY_DEFS[enemyType].hp
           };
         } else if (type === OBJECT_TYPES.ATTACK_BONUS && !data) {
@@ -216,6 +217,7 @@ export function startRun(levelId) {
           const enemyType = enemyKeys[Math.floor(random() * enemyKeys.length)];
           data = { 
             ...ENEMY_DEFS[enemyType], 
+            artId: enemyType,
             currentHp: ENEMY_DEFS[enemyType].hp,
           };
         } else if (rand < ENEMY + WALL) {
@@ -279,6 +281,7 @@ export function startRun(levelId) {
 
   const boss = {
     ...bossData,
+    artId: 'boss-01',
     pos: { x: bossX, y: bossY },
     visual: { x: bossX * DIMS.CELL_SIZE },
     inventory: {

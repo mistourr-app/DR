@@ -1,0 +1,500 @@
+{
+  "version": 1,
+  "referenceSize": [1125, 2436],
+  "dprPolicy": {
+    "fullscreenReference": [1125, 2436],
+    "canvasExport": "source-size",
+    "maxDevicePixelRatio": 3,
+    "interpolation": "high"
+  },
+  "assets": {
+    "field.background": {
+      "enabled": false,
+      "src": "assets/field/background.png",
+      "mode": "cover",
+      "sourceSize": [1125, 2436],
+      "safeArea": [120, 60, 120, 60],
+      "tags": ["field", "background"]
+    },
+    "field.dungeon": {
+      "enabled": false,
+      "src": "assets/field/dungeon-tile.png",
+      "mode": "tile",
+      "sourceSize": [256, 256],
+      "scale": 0.25,
+      "tags": ["field", "tile"]
+    },
+    "field.arena": {
+      "enabled": false,
+      "src": "assets/field/arena-tile.png",
+      "mode": "tile",
+      "sourceSize": [256, 256],
+      "scale": 0.25,
+      "tags": ["field", "tile", "boss"]
+    },
+    "field.grid": {
+      "enabled": false,
+      "src": "assets/field/grid.png",
+      "mode": "tile",
+      "sourceSize": [256, 256],
+      "scale": 0.25,
+      "tags": ["field", "grid"]
+    },
+    "field.vignette": {
+      "enabled": false,
+      "src": "assets/field/vignette.png",
+      "mode": "cover",
+      "sourceSize": [1125, 2436],
+      "tags": ["field", "overlay"]
+    },
+    "cell.regular": {
+      "enabled": false,
+      "src": "assets/cell/regular.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0, 0],
+      "safeArea": [32, 32, 32, 32],
+      "tags": ["cell"]
+    },
+    "cell.arena": {
+      "enabled": false,
+      "src": "assets/cell/arena.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0, 0],
+      "safeArea": [32, 64, 32, 64],
+      "tags": ["cell", "boss"]
+    },
+    "cell.target": {
+      "enabled": false,
+      "src": "assets/cell/target.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0, 0],
+      "tags": ["cell", "state"]
+    },
+    "cell.arena-target": {
+      "enabled": false,
+      "src": "assets/cell/arena-target.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0, 0],
+      "tags": ["cell", "state", "boss"]
+    },
+    "item.wall": {
+      "enabled": false,
+      "src": "assets/items/wall.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 0.5],
+      "tags": ["item", "wall"]
+    },
+    "item.heal": {
+      "enabled": false,
+      "src": "assets/items/heal.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["item", "consumable"]
+    },
+    "item.ammo": {
+      "enabled": false,
+      "src": "assets/items/ammo.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["item", "consumable"]
+    },
+    "item.energy": {
+      "enabled": false,
+      "src": "assets/items/energy.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["item", "consumable"]
+    },
+    "item.attack_bonus": {
+      "enabled": false,
+      "src": "assets/items/attack-bonus.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["item", "bonus"]
+    },
+    "item.defense_bonus": {
+      "enabled": false,
+      "src": "assets/items/defense-bonus.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["item", "bonus"]
+    },
+    "item.attack_cell": {
+      "enabled": false,
+      "src": "assets/items/attack-cell.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0.5, 0.5],
+      "tags": ["item", "attack"]
+    },
+    "item.gold": {
+      "enabled": false,
+      "src": "assets/items/gold.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["item", "currency"]
+    },
+    "player.regular": {
+      "enabled": false,
+      "src": "assets/player/regular.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "player"]
+    },
+    "player.arena": {
+      "enabled": false,
+      "src": "assets/player/arena.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "player", "boss"]
+    },
+    "player.idle": {
+      "enabled": false,
+      "src": "assets/player/idle.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "player", "state"]
+    },
+    "player.move": {
+      "enabled": false,
+      "src": "assets/player/move.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "player", "state"]
+    },
+    "player.shoot": {
+      "enabled": false,
+      "src": "assets/player/shoot.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "player", "state"]
+    },
+    "player.melee": {
+      "enabled": false,
+      "src": "assets/player/melee.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "player", "state"]
+    },
+    "player.damaged": {
+      "enabled": false,
+      "src": "assets/player/damaged.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "player", "state"]
+    },
+    "player.defeated": {
+      "enabled": false,
+      "src": "assets/player/defeated.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "player", "state"]
+    },
+    "enemy.type-1.idle": {
+      "enabled": false,
+      "src": "assets/enemies/type-1/idle.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-1", "state"]
+    },
+    "enemy.type-1.alert": {
+      "enabled": false,
+      "src": "assets/enemies/type-1/alert.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-1", "state"]
+    },
+    "enemy.type-1.attack": {
+      "enabled": false,
+      "src": "assets/enemies/type-1/attack.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-1", "state"]
+    },
+    "enemy.type-1.damaged": {
+      "enabled": false,
+      "src": "assets/enemies/type-1/damaged.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-1", "state"]
+    },
+    "enemy.type-1.death": {
+      "enabled": false,
+      "src": "assets/enemies/type-1/death.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-1", "state"]
+    },
+    "enemy.type-2.idle": {
+      "enabled": false,
+      "src": "assets/enemies/type-2/idle.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-2", "state"]
+    },
+    "enemy.type-2.alert": {
+      "enabled": false,
+      "src": "assets/enemies/type-2/alert.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-2", "state"]
+    },
+    "enemy.type-2.attack": {
+      "enabled": false,
+      "src": "assets/enemies/type-2/attack.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-2", "state"]
+    },
+    "enemy.type-2.damaged": {
+      "enabled": false,
+      "src": "assets/enemies/type-2/damaged.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-2", "state"]
+    },
+    "enemy.type-2.death": {
+      "enabled": false,
+      "src": "assets/enemies/type-2/death.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-2", "state"]
+    },
+    "boss.boss-01.idle": {
+      "enabled": false,
+      "src": "assets/bosses/boss-01/idle.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "boss", "boss-01", "state"]
+    },
+    "boss.boss-01.move": {
+      "enabled": false,
+      "src": "assets/bosses/boss-01/move.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "boss", "boss-01", "state"]
+    },
+    "boss.boss-01.attack-cell": {
+      "enabled": false,
+      "src": "assets/bosses/boss-01/attack-cell.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "boss", "boss-01", "state"]
+    },
+    "boss.boss-01.damaged": {
+      "enabled": false,
+      "src": "assets/bosses/boss-01/damaged.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "boss", "boss-01", "state"]
+    },
+    "boss.boss-01.death": {
+      "enabled": false,
+      "src": "assets/bosses/boss-01/death.png",
+      "mode": "sprite",
+      "sourceSize": [256, 512],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "boss", "boss-01", "state"]
+    },
+    "fx.bolt": {
+      "enabled": false,
+      "src": "assets/fx/bolt.png",
+      "mode": "sprite",
+      "sourceSize": [256, 64],
+      "anchor": [0.5, 0.5],
+      "tags": ["fx", "projectile"]
+    },
+    "fx.impact": {
+      "enabled": false,
+      "src": "assets/fx/impact.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 0.5],
+      "tags": ["fx", "impact"]
+    },
+    "fx.pickup": {
+      "enabled": false,
+      "src": "assets/fx/pickup.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 0.5],
+      "tags": ["fx", "pickup"]
+    },
+    "fx.heal": {
+      "enabled": false,
+      "src": "assets/fx/heal.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 0.5],
+      "tags": ["fx", "heal"]
+    },
+    "fx.enemy-death": {
+      "enabled": false,
+      "src": "assets/fx/enemy-death.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 0.5],
+      "tags": ["fx", "death"]
+    },
+    "ui.hud.top": {
+      "enabled": false,
+      "src": "assets/ui/hud-top.png",
+      "mode": "nine-slice",
+      "sourceSize": [1125, 180],
+      "insets": [60, 120, 60, 120],
+      "minSize": [360, 120],
+      "tags": ["ui", "hud", "nine-slice"]
+    },
+    "ui.hud.bottom": {
+      "enabled": false,
+      "src": "assets/ui/hud-bottom.png",
+      "mode": "nine-slice",
+      "sourceSize": [1125, 300],
+      "insets": [60, 120, 60, 120],
+      "minSize": [360, 240],
+      "tags": ["ui", "hud", "nine-slice"]
+    },
+    "ui.hud.boss-inventory": {
+      "enabled": false,
+      "src": "assets/ui/boss-inventory.png",
+      "mode": "nine-slice",
+      "sourceSize": [720, 180],
+      "insets": [48, 72, 48, 72],
+      "minSize": [300, 120],
+      "tags": ["ui", "boss", "nine-slice"]
+    },
+    "ui.button.primary": {
+      "enabled": false,
+      "src": "assets/ui/button-primary.png",
+      "mode": "nine-slice",
+      "sourceSize": [480, 192],
+      "insets": [72, 120, 72, 120],
+      "minSize": [240, 96],
+      "tags": ["ui", "button", "nine-slice"]
+    },
+    "ui.button.secondary": {
+      "enabled": false,
+      "src": "assets/ui/button-secondary.png",
+      "mode": "nine-slice",
+      "sourceSize": [480, 192],
+      "insets": [72, 120, 72, 120],
+      "minSize": [240, 96],
+      "tags": ["ui", "button", "nine-slice"]
+    },
+    "ui.slot.player": {
+      "enabled": false,
+      "src": "assets/ui/slot-player.png",
+      "mode": "nine-slice",
+      "sourceSize": [192, 192],
+      "insets": [48, 48, 48, 48],
+      "minSize": [48, 48],
+      "tags": ["ui", "slot", "nine-slice"]
+    },
+    "ui.slot.boss": {
+      "enabled": false,
+      "src": "assets/ui/slot-boss.png",
+      "mode": "nine-slice",
+      "sourceSize": [144, 144],
+      "insets": [36, 36, 36, 36],
+      "minSize": [36, 36],
+      "tags": ["ui", "slot", "boss", "nine-slice"]
+    },
+    "ui.icon.crossbow": {
+      "enabled": false,
+      "src": "assets/ui/crossbow.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["ui", "icon"]
+    },
+    "ui.icon.attack": {
+      "enabled": false,
+      "src": "assets/ui/attack.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["ui", "icon"]
+    },
+    "ui.icon.defense": {
+      "enabled": false,
+      "src": "assets/ui/defense.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["ui", "icon"]
+    },
+    "ui.icon.gold": {
+      "enabled": false,
+      "src": "assets/ui/gold.png",
+      "mode": "sprite",
+      "sourceSize": [128, 128],
+      "anchor": [0.5, 0.5],
+      "tags": ["ui", "icon", "currency"]
+    },
+    "ui.screen.level-select": {
+      "enabled": false,
+      "src": "assets/ui/screen-level-select.png",
+      "mode": "cover",
+      "sourceSize": [1125, 2436],
+      "safeArea": [90, 120, 90, 120],
+      "tags": ["ui", "screen"]
+    },
+    "ui.screen.victory": {
+      "enabled": false,
+      "src": "assets/ui/screen-victory.png",
+      "mode": "cover",
+      "sourceSize": [1125, 2436],
+      "safeArea": [90, 120, 90, 120],
+      "tags": ["ui", "screen"]
+    },
+    "ui.screen.defeat": {
+      "enabled": false,
+      "src": "assets/ui/screen-defeat.png",
+      "mode": "cover",
+      "sourceSize": [1125, 2436],
+      "safeArea": [90, 120, 90, 120],
+      "tags": ["ui", "screen"]
+    },
+    "ui.screen.tutorial": {
+      "enabled": false,
+      "src": "assets/ui/screen-tutorial.png",
+      "mode": "cover",
+      "sourceSize": [1125, 2436],
+      "safeArea": [90, 120, 90, 120],
+      "tags": ["ui", "screen", "tutorial"]
+    }
+  }
+}

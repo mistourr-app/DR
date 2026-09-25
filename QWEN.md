@@ -22,6 +22,9 @@ Dungeon Card Crawler — мобильный пошаговый dungeon crawler �
 | `events.js` | Шина событий |
 | `utils.js` | Seeded PRNG и генерация объектов |
 | `tutorial.js` | Фиксированный tutorial из 14 шагов |
+| `assets/loader.js` | Загрузка PNG и адаптивные режимы отображения |
+| `assets/manifest.json` | Контракт graphic IDs, размеров и режимов |
+| `GRAPHICS.md` | Figma pipeline и asset specification |
 | `server.js` | Локальный статический сервер для разработки |
 | `admin.html` | Встроенный редактор уровней |
 
@@ -80,10 +83,10 @@ BOOT → META_HUB → RUN_PLAYING → RUN_SUMMARY / RUN_VICTORY → META_HUB
 
 - `manifest.json` и `sw.js` включены в приложение.
 - Service worker использует network-first для навигации с fallback на precached response, затем `index.html` для неизвестных navigation requests; остальные локальные ресурсы — cache-first.
-- Версия cache: `dungeon-crawler-v24`; `styles.css` — отслеживаемый артефакт, генерируемый `npm run build:css`.
+- Версия cache: `dungeon-crawler-v25`; `styles.css` — отслеживаемый артефакт, генерируемый `npm run build:css`.
 - UI перерисовывает верхнюю панель при смене состояния; инвентарь босса отображается только в `boss_arena`, а слоты босса используют компактный размер.
 - В игровом UI значения и inline-цвета экранируются/whitelist-проверяются перед вставкой в HTML.
-- Marker версии в игре — `v24`; кнопка возврата из встроенного редактора ведёт в `index.html`.
+- Marker версии в игре — `v25`; кнопка возврата из встроенного редактора ведёт в `index.html`.
 - Tailwind собирается локально; CDN в игровом UI не используется.
 
 ## Запуск и проверки
@@ -100,6 +103,7 @@ npm start
 npm test
 npm run lint
 npm run typecheck
+npm run graphics:check
 npm run build:css
 git diff --check
 ```

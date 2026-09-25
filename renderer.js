@@ -3,6 +3,7 @@ import { DIMS } from './config.js';
 import { OBJECT_TYPES, CELL_DEFS, ENEMY_DEFS } from './registry.js';
 import { getThreatMaps } from './enemyAI.js';
 import { getCurrentStep, getTutorialAllowedCells } from './tutorial.js';
+import { drawAsset } from './assets/loader.js';
 
 let ctx;
 
@@ -21,6 +22,43 @@ function getRowY(y, totalRows) {
 function getCellHeight(y, totalRows) {
   const isArenaRow = y >= totalRows - 2;
   return isArenaRow ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
+}
+
+function getCellArtId(cell) {
+  if (!cell) return null;
+  if (cell.type === OBJECT_TYPES.ENEMY) {
+    const enemyType = cell.data?.artId || (cell.data?.label === 'СТРАЖ' ? 'type-2' : 'type-1');
+    const enemyState = cell.visual?.state || 'idle';
+    return `enemy.${enemyType}.${enemyState}`;
+  }
+  if (cell.type === OBJECT_TYPES.WALL) return 'item.wall';
+  if (cell.type === OBJECT_TYPES.HEAL) return 'item.heal';
+  if (cell.type === OBJECT_TYPES.AMMO) return 'item.ammo';
+  if (cell.type === OBJECT_TYPES.ENERGY) return 'item.energy';
+  if (cell.type === OBJECT_TYPES.ATTACK_BONUS) return 'item.attack_bonus';
+  if (cell.type === OBJECT_TYPES.DEFENSE_BONUS) return 'item.defense_bonus';
+  if (cell.type === OBJECT_TYPES.ATTACK_CELL) return 'item.attack_cell';
+  if (cell.type === OBJECT_TYPES.GOLD) return 'item.gold';
+  return null;
+}
+
+function getCellArtPlacement(cell, width, height) {
+  const id = getCellArtId(cell);
+  if (!id) return null;
+  const isItem = cell.type !== OBJECT_TYPES.ENEMY && cell.type !== OBJECT_TYPES.WALL;
+  // Высокие клетки арены (attack_cell) используют спрайт во весь размер,
+  // остальные предметы вписываются в квадрат по меньшей стороне.
+  const isTallCell = height > width * 1.2;
+  const size = isItem ? Math.min(width, height) * 0.78 : Math.min(width, height);
+  const drawWidth = isTallCell ? width : size;
+  const drawHeight = isTallCell ? height : size;
+  return {
+    id,
+    x: (width - drawWidth) / 2,
+    y: (height - drawHeight) / 2,
+    width: drawWidth,
+    height: drawHeight,
+  };
 }
 
 export function initRenderer(canvasContext) {
@@ -61,6 +99,10 @@ export function renderRun(deltaTime = 1000 / 60) {
   // --- Карта угроз (кэшированная) ---
   const { idleThreatMap, alertThreatMap } = getThreatMaps(rows, player.pos);
 
+  drawAsset(ctx, 'field.background', 0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
+  drawAsset(ctx, runState.levelPhase === 'boss_arena' ? 'field.arena' : 'field.dungeon', 0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
+  drawAsset(ctx, 'field.grid', 0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
+
   // --- Новый двухпроходный рендер ---
   // Pass 1: Собираем информацию обо всех видимых клетках
   const cellsToDraw = [];
@@ -70,7 +112,7 @@ export function renderRun(deltaTime = 1000 / 60) {
       const cellHeight = getCellHeight(y, runState.totalRows);
       
       // Координаты для фона клетки (статичные, по сетке)
-      const cellY = ctx.canvas.height - (getRowY(y, runState.totalRows) - scrollY) - cellHeight;
+      const cellY = DIMS.CANVAS_HEIGHT - (getRowY(y, runState.totalRows) - scrollY) - cellHeight;
       
       // Координаты для содержимого - используем те же координаты что и фон + анимационное смещение
       const animOffsetY = (cell.visual.y - getRowY(y, runState.totalRows)) || 0;
@@ -130,7 +172,7 @@ export function renderRun(deltaTime = 1000 / 60) {
 
   // Отрисовка игрока (всегда, даже если HP <= 0)
   const playerCellHeight = getCellHeight(player.pos.y, runState.totalRows);
-  const playerCellY = ctx.canvas.height - (getRowY(player.pos.y, runState.totalRows) - scrollY) - playerCellHeight;
+  const playerCellY = DIMS.CANVAS_HEIGHT - (getRowY(player.pos.y, runState.totalRows) - scrollY) - playerCellHeight;
   const playerAnimOffsetY = (player.visual.y - getRowY(player.pos.y, runState.totalRows)) || 0;
   const playerDrawY = playerCellY - playerAnimOffsetY;
   const playerAnimOffsetX = (player.visual.x - player.pos.x * DIMS.CELL_SIZE) || 0;
@@ -143,7 +185,7 @@ export function renderRun(deltaTime = 1000 / 60) {
     const bossPos = boss.pos;
     const bossCellHeight = getCellHeight(bossPos.y, runState.totalRows);
     const bossGridY = getRowY(bossPos.y, runState.totalRows);
-    const bossCellY = ctx.canvas.height - (bossGridY - scrollY) - bossCellHeight;
+    const bossCellY = DIMS.CANVAS_HEIGHT - (bossGridY - scrollY) - bossCellHeight;
     const bossDrawX = boss.visual ? boss.visual.x : bossPos.x * DIMS.CELL_SIZE;
     const bossDrawY = bossCellY;
     drawBossCard(bossDrawX, bossDrawY);
@@ -172,6 +214,7 @@ function drawCellBackground(x, y, gx, gy) {
   ctx.beginPath();
   ctx.roundRect(0, 0, w, h, 8);
   ctx.fill();
+  drawAsset(ctx, gy >= totalRows - 2 ? 'cell.arena' : 'cell.regular', 0, 0, w, h, { anchor: [0, 0] });
 
   // Единая обводка для всех клеток
   ctx.strokeStyle = "#2d313d";
@@ -198,6 +241,11 @@ function drawCellContent(x, y, cell, gx, gy, isVisible, isPassed, isInRange) {
     ctx.globalAlpha *= 0.3;
   } else if (!isVisible && !cell.isAnimating) {
     ctx.globalAlpha *= 0.5;
+  }
+
+  const artPlacement = getCellArtPlacement(cell, w, h);
+  if (artPlacement) {
+    drawAsset(ctx, artPlacement.id, artPlacement.x, artPlacement.y, artPlacement.width, artPlacement.height);
   }
 
   // Объекты НЕ имеют фона, только обводку (если нужно)
@@ -310,7 +358,7 @@ function drawThreatHighlight(x, y, gx, gy, idleThreatMap, alertThreatMap) {
   ctx.beginPath();
   ctx.roundRect(0, 0, w, h, 8);
 
-  const alpha = Math.min(0.45, 0.15 * totalCount);
+  const alpha = Math.min(1, 0.25 * totalCount);
   ctx.fillStyle = alertCount > 0
     ? `rgba(245, 158, 11, ${alpha})`
     : `rgba(239, 68, 68, ${alpha})`;
@@ -329,7 +377,7 @@ function renderFloatingTexts(scrollY) {
 
   for (const ft of floatingTexts) {
     const drawX = ft.visual.x + DIMS.CELL_SIZE / 2;
-    const drawY = ctx.canvas.height - (ft.visual.y - scrollY) - DIMS.CELL_SIZE / 2;
+    const drawY = DIMS.CANVAS_HEIGHT - (ft.visual.y - scrollY) - DIMS.CELL_SIZE / 2;
 
     ctx.globalAlpha = ft.visual.alpha;
     ctx.fillStyle = ft.color;
@@ -372,10 +420,10 @@ function renderTacticalElements(scrollY) {
       ctx.save();
 
       const startX = player.visual.x + DIMS.CELL_SIZE / 2;
-      const startY = ctx.canvas.height - (player.visual.y - scrollY) - DIMS.CELL_SIZE / 2;
+      const startY = DIMS.CANVAS_HEIGHT - (player.visual.y - scrollY) - DIMS.CELL_SIZE / 2;
 
       const endX = targetCell.visual.x + DIMS.CELL_SIZE / 2;
-      const endY = ctx.canvas.height - (targetCell.visual.y - scrollY) - DIMS.CELL_SIZE / 2;
+      const endY = DIMS.CANVAS_HEIGHT - (targetCell.visual.y - scrollY) - DIMS.CELL_SIZE / 2;
 
       ctx.beginPath();
       ctx.setLineDash([5, 10]);
@@ -400,10 +448,10 @@ function renderTacticalElements(scrollY) {
       ctx.save();
 
       const startX = player.visual.x + DIMS.CELL_SIZE / 2;
-      const startY = ctx.canvas.height - (player.visual.y - scrollY) - player.visual.h / 2;
+      const startY = DIMS.CANVAS_HEIGHT - (player.visual.y - scrollY) - player.visual.h / 2;
 
       const endX = bossCell.visual.x + DIMS.CELL_SIZE / 2;
-      const endY = ctx.canvas.height - (bossCell.visual.y - scrollY) - (DIMS.CELL_SIZE * 2) / 2;
+      const endY = DIMS.CANVAS_HEIGHT - (bossCell.visual.y - scrollY) - (DIMS.CELL_SIZE * 2) / 2;
 
       ctx.beginPath();
       ctx.setLineDash([5, 10]);
@@ -545,6 +593,10 @@ function drawPlayerCard(x, y) {
   ctx.beginPath();
   ctx.roundRect(0, 0, w, h, 12);
   ctx.fill();
+  const playerAssetId = player.visual.h > DIMS.CELL_SIZE * 1.5
+    ? 'player.arena'
+    : (player.visual.state ? `player.${player.visual.state}` : 'player.regular');
+  drawAsset(ctx, playerAssetId, 0, 0, w, h, { anchor: [0, 0] });
   ctx.stroke();
 
   // Текст
@@ -598,6 +650,8 @@ function drawBossCard(x, y) {
   ctx.beginPath();
   ctx.roundRect(0, 0, w, h, 12);
   ctx.fill();
+  const bossAssetId = `boss.${boss.artId || 'boss-01'}.${boss.visual?.state || 'idle'}`;
+  drawAsset(ctx, bossAssetId, 0, 0, w, h, { anchor: [0, 0] });
   ctx.stroke();
 
   // Текст
@@ -619,12 +673,12 @@ function renderTutorialHint() {
 
   ctx.save();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(0, 0, ctx.canvas.width, 60);
+  ctx.fillRect(0, 0, DIMS.CANVAS_WIDTH, 60);
   
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 16px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(step.text, ctx.canvas.width / 2, 30);
+  ctx.fillText(step.text, DIMS.CANVAS_WIDTH / 2, 30);
   ctx.restore();
 }

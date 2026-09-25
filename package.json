@@ -8,7 +8,8 @@
     "test": "node --test",
     "build:css": "tailwindcss -i ./src/input.css -o ./styles.css --minify",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "graphics:check": "node scripts/check-graphics.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.10",

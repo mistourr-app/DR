@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dungeon-crawler-v24';
+const CACHE_NAME = 'dungeon-crawler-v25';
 const FILES_TO_CACHE = [
   './',
   './index.html',
@@ -8,7 +8,7 @@ const FILES_TO_CACHE = [
   './icon-512.png',
   './styles.css',
   './main.js',
-  './main.js?v=24',
+  './main.js?v=25',
   './state.js',
   './config.js',
   './ui.js',
@@ -22,12 +22,29 @@ const FILES_TO_CACHE = [
   './events.js',
   './utils.js',
   './tutorial.js',
+  './assets/manifest.json',
+  './assets/loader.js',
 ];
+
+async function cacheGraphics(cache) {
+  try {
+    const response = await fetch('./assets/manifest.json', { cache: 'no-cache' });
+    if (!response.ok) return;
+    const manifest = await response.json();
+    const entries = Object.values(manifest.assets || {}).filter((entry) => entry && entry.enabled !== false && typeof entry.src === 'string');
+    await Promise.allSettled(entries.map((entry) => cache.add(new URL(entry.src, self.location.href).href)));
+  } catch {
+    return;
+  }
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(FILES_TO_CACHE))
+      .then(async (cache) => {
+        await cache.addAll(FILES_TO_CACHE);
+        await cacheGraphics(cache);
+      })
       .then(() => self.skipWaiting())
   );
 });

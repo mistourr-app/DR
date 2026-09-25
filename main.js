@@ -6,6 +6,7 @@ import { startRun, processPlayerAction, initRun, getDeathType, resizeRunVisuals 
 import { initRenderer, renderRun } from './renderer.js';
 import { updateAnimations, isAnimating, clearAnimations } from './animation.js';
 import { isClickAllowed, stopTutorial } from './tutorial.js';
+import { loadAssets } from './assets/loader.js';
 
 const canvas = document.getElementById('gameCanvas');
 if (!canvas) {
@@ -27,8 +28,14 @@ function resize() {
   DIMS.CANVAS_WIDTH = DIMS.COLS * DIMS.CELL_SIZE;
   DIMS.CANVAS_HEIGHT = (DIMS.VISIBLE_ROWS + 1) * DIMS.CELL_SIZE;
 
-  canvas.width = DIMS.CANVAS_WIDTH;
-  canvas.height = DIMS.CANVAS_HEIGHT;
+  const dpr = Math.min(Math.max(Number(window.devicePixelRatio) || 1, 1), 3);
+  canvas.width = Math.max(1, Math.round(DIMS.CANVAS_WIDTH * dpr));
+  canvas.height = Math.max(1, Math.round(DIMS.CANVAS_HEIGHT * dpr));
+  canvas.style.width = `${DIMS.CANVAS_WIDTH}px`;
+  canvas.style.height = `${DIMS.CANVAS_HEIGHT}px`;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   resizeRunVisuals(previousCellSize);
 
   document.getElementById('top-ui-bar').style.height = `${DIMS.TOP_UI_H}px`;
@@ -200,11 +207,13 @@ function gameLoop(time = 0) {
 document.body.style.margin = '0';
 resize();
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
 canvas.addEventListener('click', handleCanvasClick);
 initRenderer(ctx);
 initRun(onStateChange); // Передаём callback в run.js для вызова showGameOverScreen/showVictoryScreen
 
 loadMetaState();
+loadAssets({ onError: (error) => console.warn('Graphics assets unavailable; using procedural fallback', error) });
 const requestedLevelId = new URLSearchParams(window.location.search).get('level');
 if (requestedLevelId && getLevelById(requestedLevelId) && startRun(requestedLevelId)) {
   resetTopBar();

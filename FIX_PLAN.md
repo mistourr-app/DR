@@ -51,9 +51,10 @@
 
 - Исправлены золото, угрозы нескольких врагов, full-inventory fade и free melee без энергии.
 - Камера, floating texts и тактические линии используют delta-time; линия выстрела рисуется поверх карточек игрока и босса.
-- Service worker зарегистрирован; cache version — `dungeon-crawler-v24`; offline fallback сохраняет precached `admin.html`.
+- Service worker зарегистрирован; cache version — `dungeon-crawler-v25`; offline fallback сохраняет precached `admin.html`.
 - `styles.css` собирается локально из `src/input.css`, отслеживается в репозитории и проверяется CI; CDN в игровом UI отсутствует.
-- Добавлены `node:test`, regression-тесты gameplay и state/server, `npm run lint`, `npm run typecheck` и GitHub Actions на Node.js 20.
+- Добавлен PNG graphics pipeline: `GRAPHICS.md`, `assets/manifest.json` (`1125×2436`), loader с `cover/tile/9-slice/sprite` и procedural fallback; canvas стал DPR-aware.
+- Добавлены `node:test`, regression-тесты gameplay и state/server/graphics, `npm run lint`, `npm run typecheck`, `npm run graphics:check` и GitHub Actions на Node.js 20.
 - `typecheck` не включает `checkJs`; lint не проверяет inline JavaScript в HTML.
 - Синхронизированы `README.md`, `QUICKSTART.md`, `MOVEMENT.md`, `META.md`, `QWEN.md` и этот план.
 - Удалены только `.qwen/settings.json` и `.qwen/settings.json.orig`; остальные упомянутые старые каталоги уже отсутствовали в базовом commit.
@@ -69,7 +70,7 @@ npm run build:css
 git diff --check
 ```
 
-Текущий результат: 25 автоматических тестов проходят; lint и typecheck проходят; CSS собирается локально.
+Текущий результат: 28 автоматических тестов проходят; lint, typecheck и graphics manifest check проходят; CSS собирается локально.
 
 Дополнительно нужен ручной browser smoke test: tutorial, выход в меню, повторный запуск, босс, resize и офлайн-PWA. Автоматические проверки и HTTP smoke покрывают серверные сценарии; browser smoke остаётся отдельной ручной проверкой.
 

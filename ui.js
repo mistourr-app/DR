@@ -1,6 +1,7 @@
 import { LEVELS, CELL_DEFS, OBJECT_TYPES } from './registry.js';
 import { getGameState } from './state.js';
 import { scheduleRunCallback } from './animation.js';
+import { getAssetDefinition, getAssetUrl } from './assets/loader.js';
 
 function readStorageJson(key, fallback) {
   try {
@@ -21,6 +22,45 @@ function escapeHtml(value) {
     '"': '&quot;',
     "'": '&#39;',
   })[character]);
+}
+
+function applyAssetBackgrounds(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-asset-id]').forEach((element) => {
+    applyAssetBackground(element, element.dataset.assetId);
+  });
+}
+
+function applyAssetBackground(element, assetId) {
+  const asset = getAssetDefinition(assetId);
+  const url = getAssetUrl(assetId);
+  if (!element || !asset || !url) return;
+  // Контент перерисовывается каждый кадр, поэтому не пересоздаём стили без изменения URL.
+  if (element.dataset.assetApplied === url) return;
+  element.dataset.assetApplied = url;
+
+  if (asset.mode === 'nine-slice') {
+    const insets = Array.isArray(asset.insets) ? asset.insets : [0, 0, 0, 0];
+    const sourceSize = Array.isArray(asset.sourceSize) ? asset.sourceSize : [1, 1];
+    const borderWidths = [
+      `${(insets[0] / sourceSize[1]) * 100}%`,
+      `${(insets[1] / sourceSize[0]) * 100}%`,
+      `${(insets[2] / sourceSize[1]) * 100}%`,
+      `${(insets[3] / sourceSize[0]) * 100}%`,
+    ];
+    element.style.borderStyle = 'solid';
+    element.style.borderWidth = borderWidths.join(' ');
+    element.style.borderImageSource = `url("${url}")`;
+    element.style.borderImageSlice = `${insets.join(' ')} fill`;
+    element.style.borderImageRepeat = 'stretch';
+    element.style.borderImageWidth = borderWidths.join(' ');
+    return;
+  }
+
+  element.style.backgroundImage = `url("${url}")`;
+  element.style.backgroundRepeat = asset.mode === 'tile' ? 'repeat' : 'no-repeat';
+  element.style.backgroundPosition = 'center';
+  element.style.backgroundSize = asset.mode === 'cover' ? 'cover' : 'contain';
 }
 
 // Получаем ссылки на все оверлеи один раз
@@ -64,6 +104,7 @@ export function showLevelSelectScreen(onLevelSelect) {
   hideAllScreens();
   if (levelSelectScreen) {
     levelSelectScreen.style.display = 'flex';
+    applyAssetBackground(levelSelectScreen, 'ui.screen.level-select');
 
     const container = document.getElementById('level-buttons-container');
     if (!container) return;
@@ -112,6 +153,8 @@ export function showLevelSelectScreen(onLevelSelect) {
  */
 export function renderTopBar(runState, onExit) {
   if (!topUiBar) return;
+  applyAssetBackground(topUiBar, 'ui.hud.top');
+  applyAssetBackground(inventoryDisplay, 'ui.hud.bottom');
 
   // Инициализируем содержимое только один раз, чтобы не терять обработчик событий
   if (!topUiBar.dataset.initialized) {
@@ -128,20 +171,22 @@ export function renderTopBar(runState, onExit) {
 
   // Отрисовка инвентаря босса, если мы на арене
   const bossInventoryDisplay = document.getElementById('boss-inventory-display');
+  applyAssetBackground(bossInventoryDisplay, 'ui.hud.boss-inventory');
   if (bossInventoryDisplay && runState?.levelPhase === 'boss_arena' && runState.boss) {
     const { inventory } = runState.boss;
     let bossInventoryHtml = '';
     // Слоты для бонусов атаки босса
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.attackBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, null, true) : createSlot('-', 'Атака', '#6b7280', true, null, null, true);
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, null, true, 'ui.icon.attack') : createSlot('-', 'Атака', '#6b7280', true, null, null, true, 'ui.slot.boss');
     }
     // Слоты для бонусов защиты босса
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.defenseBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, true) : createSlot('-', 'Защита', '#6b7280', true, null, null, true);
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, true, 'ui.icon.defense') : createSlot('-', 'Защита', '#6b7280', true, null, null, true, 'ui.slot.boss');
     }
     bossInventoryDisplay.innerHTML = bossInventoryHtml;
+    applyAssetBackgrounds(bossInventoryDisplay);
   } else if (bossInventoryDisplay) {
     bossInventoryDisplay.innerHTML = '';
   }
@@ -172,7 +217,7 @@ export function resetTopBar() {
  * @param {boolean} [isSmall=false] - Если true, используется уменьшенный размер для инвентаря босса.
  * @returns {string} - HTML-строка.
  */
-function createSlot(value, label, valueColor = '#ffffff', isEmpty = false, secondaryValue = null, secondaryColor = null, isSmall = false) {
+function createSlot(value, label, valueColor = '#ffffff', isEmpty = false, secondaryValue = null, secondaryColor = null, isSmall = false, assetId = null) {
   const emptyClass = isEmpty ? 'opacity-40' : '';
   const sizeClasses = isSmall ? 'w-12 h-12' : 'w-16 h-16';
   const safeValue = escapeHtml(value);
@@ -183,7 +228,7 @@ function createSlot(value, label, valueColor = '#ffffff', isEmpty = false, secon
   // Обертка для слота и его подписи
   return `
     <div class="flex flex-col items-center">
-      <div class="flex flex-col items-center justify-center ${sizeClasses} bg-gray-800 border border-gray-600 rounded-md p-1 ${emptyClass}">
+      <div class="flex flex-col items-center justify-center ${sizeClasses} bg-gray-800 border border-gray-600 rounded-md p-1 ${emptyClass}"${assetId ? ` data-asset-id="${escapeHtml(assetId)}"` : ''}>
         <span class="text-2xl font-black leading-tight" style="color: ${safeValueColor};">${safeValue}</span>
         <!-- Вторичный текст, используется для зарядов арбалета -->
         ${safeSecondaryValue ? `<span class="text-xs font-bold" style="color: ${safeSecondaryColor};">${safeSecondaryValue}</span>` : ''}
@@ -212,24 +257,27 @@ export function renderUi(runState) {
       '#ffffff', // Урон белым
       false, 
       `${inventory.ammo}/${inventory.maxAmmo}`,
-      CELL_DEFS[OBJECT_TYPES.AMMO].color // Заряды цветом клеток
+      CELL_DEFS[OBJECT_TYPES.AMMO].color, // Заряды цветом клеток
+      false,
+      'ui.icon.crossbow'
     );
   }
 
   // Слоты для бонусов атаки (всегда 2)
   for (let i = 0; i < 2; i++) {
     const bonus = inventory.attackBonuses[i];
-    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color) : createSlot('-', 'Атака', '#6b7280', true);
+    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, null, false, 'ui.icon.attack') : createSlot('-', 'Атака', '#6b7280', true, null, null, false, 'ui.slot.player');
   }
 
   // Слоты для бонусов защиты (всегда 2)
   for (let i = 0; i < 2; i++) {
     const bonus = inventory.defenseBonuses[i];
-    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color) : createSlot('-', 'Защита', '#6b7280', true);
+    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, false, 'ui.icon.defense') : createSlot('-', 'Защита', '#6b7280', true, null, null, false, 'ui.slot.player');
   }
 
   // Используем innerHTML, так как это простой и быстрый способ для такого UI
   inventoryDisplay.innerHTML = inventoryHtml;
+  applyAssetBackgrounds(inventoryDisplay);
 }
 
 /**
@@ -240,6 +288,7 @@ export function renderUi(runState) {
  */
 export function showGameOverScreen(onRestart, onGoToMenu, deathType = 'damage') {
   if (gameOverScreen) {
+    applyAssetBackground(gameOverScreen, 'ui.screen.defeat');
     // Устанавливаем текст в зависимости от типа смерти
     const titleEl = document.getElementById('game-over-title');
     const messageEl = document.getElementById('game-over-message');
@@ -280,6 +329,7 @@ export function showGameOverScreen(onRestart, onGoToMenu, deathType = 'damage') 
  */
 export function showVictoryScreen(onGoToMenu) {
   if (victoryScreen) {
+    applyAssetBackground(victoryScreen, 'ui.screen.victory');
     victoryScreen.style.display = 'flex';
 
     const toMenuBtn = document.getElementById('victory-to-menu-btn');

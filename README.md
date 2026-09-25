@@ -73,7 +73,7 @@
 
 ### Визуальные эффекты
 - ✅ Подсветка возможных ходов (зеленый, фиолетовый для прыжка, красный)
-- ✅ Подсветка зон угрозы врагов (оранжевый 15% за alert, красный 15% за idle; суммарная прозрачность ограничена 45%)
+- ✅ Подсветка зон угрозы врагов (оранжевый 25% за alert, красный 25% за idle; суммарная прозрачность ограничена 100%)
 - ✅ Наложение угроз от нескольких врагов (суммирование прозрачности)
 - ✅ Всплывающие цифры урона/лечения
 - ✅ Красное мигание экрана при уроне игроку
@@ -132,6 +132,9 @@
 - **registry.js** - регистры врагов, клеток, уровней
 - **utils.js** - утилиты (PRNG, генерация объектов)
 - **tutorial.js** - система обучения (14 шагов)
+- **assets/loader.js** - загрузка PNG-графики, режимы `cover/tile/9-slice/sprite`
+- **assets/manifest.json** - контракт графики и адаптивных режимов
+- **GRAPHICS.md** - Figma/asset pipeline и техническая спецификация
 
 ### Состояния приложения
 ```
@@ -162,6 +165,7 @@ npm start
 npm test
 npm run lint
 npm run typecheck
+npm run graphics:check
 npm run build:css
 git diff --check
 ```
@@ -178,10 +182,10 @@ git diff --check
 
 ### PWA и безопасность
 
-- Service worker использует `dungeon-crawler-v24`: навигация network-first с fallback на precache, остальные локальные ресурсы cache-first.
+- Service worker использует `dungeon-crawler-v25`: навигация network-first с fallback на precache, остальные локальные ресурсы cache-first.
 - `styles.css` генерируется из `src/input.css` и должен быть закоммичен вместе с HTML/service worker.
 - Для офлайн-навигации `admin.html` использует соб precached response; неизвестные navigation requests используют fallback на `index.html`.
-- Версия v24 синхронизирована в `index.html` и `sw.js`; при изменении assets нужно обновить обе версии и пересобрать CSS.
+- Версия v25 синхронизирована в `index.html` и `sw.js`; при изменении assets нужно обновить обе версии и пересобрать CSS.
 - `server.js` проверяет lexical и real path, скрытые файлы, traversal, null/backslash, ограничивает методы `GET`/`HEAD` и добавляет security headers. Он всё ещё отдаёт доступные файлы проекта и не является production web server.
 
 ### Обучение
