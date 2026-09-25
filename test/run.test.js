@@ -87,10 +87,10 @@ test('attack and defense bonuses can be picked up without exceptions', () => {
 
 test('the same seed produces the same procedural map', () => {
   window.location.search = '?seed=123';
-  assert.equal(startRun('sector_1'), true);
+  assert.equal(startRun('dungeon_01'), true);
   const firstMap = JSON.stringify(getGameState().runState.rows);
 
-  assert.equal(startRun('sector_1'), true);
+  assert.equal(startRun('dungeon_01'), true);
   const secondMap = JSON.stringify(getGameState().runState.rows);
 
   assert.equal(firstMap, secondMap);
@@ -235,7 +235,7 @@ test('distant melee requires jump energy and resets the row shot flag', () => {
 
 test('melee entering the boss arena hands off after combat', () => {
   window.location.search = '';
-  assert.equal(startRun('sector_1'), true);
+  assert.equal(startRun('dungeon_01'), true);
   const runState = getGameState().runState;
   const arenaY = runState.totalRows - 2;
   runState.player.pos = { x: 2, y: arenaY - 1 };

@@ -51,10 +51,11 @@
 
 - Исправлены золото, угрозы нескольких врагов, full-inventory fade и free melee без энергии.
 - Камера, floating texts и тактические линии используют delta-time; линия выстрела рисуется поверх карточек игрока и босса.
-- Service worker зарегистрирован; cache version — `dungeon-crawler-v25`; offline fallback сохраняет precached `admin.html`.
+- Service worker зарегистрирован; cache version — `dungeon-crawler-v26`; offline fallback сохраняет precached `admin.html`.
 - `styles.css` собирается локально из `src/input.css`, отслеживается в репозитории и проверяется CI; CDN в игровом UI отсутствует.
 - Добавлен PNG graphics pipeline: `GRAPHICS.md`, `assets/manifest.json` (`1125×2436`), loader с `cover/tile/9-slice/sprite` и procedural fallback; canvas стал DPR-aware.
-- Добавлены `node:test`, regression-тесты gameplay и state/server/graphics, `npm run lint`, `npm run typecheck`, `npm run graphics:check` и GitHub Actions на Node.js 20.
+- Кампания переведена на кривую `CAMPAIGN_CURVE`: 30 уровней `Dungeon 1..30` (`dungeon_01`..`dungeon_30`) с линейным ростом рядов `30 → 75`, `bossHpMultiplier` `1.2 → 5`, `ENEMY` `0.10 → 0.20`, `WALL` `0.15 → 0.30` и убывающими бонусами; `DATA_VERSION` поднят до 3, старые `sector_1`/`sector_2`/`core` удалены, селект уровней прокручивается.
+- Добавлены `node:test`, regression-тесты gameplay и state/server/graphics/levels, `npm run lint`, `npm run typecheck`, `npm run graphics:check` и GitHub Actions на Node.js 20.
 - `typecheck` не включает `checkJs`; lint не проверяет inline JavaScript в HTML.
 - Синхронизированы `README.md`, `QUICKSTART.md`, `MOVEMENT.md`, `META.md`, `QWEN.md` и этот план.
 - Удалены только `.qwen/settings.json` и `.qwen/settings.json.orig`; остальные упомянутые старые каталоги уже отсутствовали в базовом commit.

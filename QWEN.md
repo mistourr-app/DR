@@ -11,7 +11,7 @@ Dungeon Card Crawler — мобильный пошаговый dungeon crawler �
 | `main.js` | Точка входа, canvas, resize, game loop, service worker |
 | `config.js` | Размеры canvas и состояния приложения |
 | `state.js` | `runState`, `metaState`, run ID, localStorage |
-| `registry.js` | Уровни, клетки, враги, валидация уровней |
+| `registry.js` | Уровни, кривая кампании Dungeon 1..30, клетки, враги, валидация уровней |
 | `run.js` | Генерация забега, движение, взаимодействия, передача хода |
 | `combat.js` | Урон, атакующие и защитные бонусы |
 | `enemyAI.js` | Атаки врагов и карты угроз |
@@ -60,11 +60,9 @@ BOOT → META_HUB → RUN_PLAYING → RUN_SUMMARY / RUN_VICTORY → META_HUB
 | `tutorial` | 13 | x1 | Фиксированный tutorial |
 | `test_arena` | 6 | x1.5 | Скрытая тестовая арена |
 | `debug_boss` | 3 | x1 | Скрытая арена для боссфайта |
-| `sector_1` | 30 | x1.2 | Обычный уровень |
-| `sector_2` | 50 | x1.5 | Повышенная сложность |
-| `core` | 75 | x5 | Финальный уровень |
+| `dungeon_01`..`dungeon_30` | 30 → 75 | x1.2 → x5 | Кампания, линейно из `CAMPAIGN_CURVE` |
 
-`test_arena` и `debug_boss` скрыты в registry и не появляются в обычном меню. Админка может менять текущий список, порядок и visibility в рамках страницы, но постоянное изменение требует экспорта в `registry.js`.
+`test_arena` и `debug_boss` скрыты в registry и не появляются в обычном меню. Админка может менять текущий список, порядок и visibility в рамках страницы; в `levelOrder` она пишет только известные id и не включает служебные уровни. Постоянное изменение требует экспорта в `registry.js`.
 
 ## Мета-состояние
 
@@ -83,10 +81,10 @@ BOOT → META_HUB → RUN_PLAYING → RUN_SUMMARY / RUN_VICTORY → META_HUB
 
 - `manifest.json` и `sw.js` включены в приложение.
 - Service worker использует network-first для навигации с fallback на precached response, затем `index.html` для неизвестных navigation requests; остальные локальные ресурсы — cache-first.
-- Версия cache: `dungeon-crawler-v25`; `styles.css` — отслеживаемый артефакт, генерируемый `npm run build:css`.
+- Версия cache: `dungeon-crawler-v26`; `styles.css` — отслеживаемый артефакт, генерируемый `npm run build:css`.
 - UI перерисовывает верхнюю панель при смене состояния; инвентарь босса отображается только в `boss_arena`, а слоты босса используют компактный размер.
 - В игровом UI значения и inline-цвета экранируются/whitelist-проверяются перед вставкой в HTML.
-- Marker версии в игре — `v25`; кнопка возврата из встроенного редактора ведёт в `index.html`.
+- Marker версии в игре — `v26`; кнопка возврата из встроенного редактора ведёт в `index.html`.
 - Tailwind собирается локально; CDN в игровом UI не используется.
 
 ## Запуск и проверки
@@ -97,7 +95,7 @@ npm run build:css
 npm start
 ```
 
-Открыть `http://127.0.0.1:5500`. Для повторяемого забега использовать `?seed=12345`; для прямого запуска уровня — `?level=sector_1`.
+Открыть `http://127.0.0.1:5500`. Для повторяемого забега использовать `?seed=12345`; для прямого запуска уровня — `?level=dungeon_01`.
 
 ```bash
 npm test
@@ -118,7 +116,7 @@ CI выполняет `npm ci` на Node.js 20 и проверяет отсут�
 - Админка экранирует ввод и ограничивает числовые поля; HTML-скрипты не входят в ESLint.
 - `server.js` слушает только `127.0.0.1`, проверяет lexical/real path, dotfiles, traversal, null/backslash, методы и security headers; это dev server, не production reverse proxy.
 - ESLint использует `eslint:recommended` с отключёнными `no-unused-vars`/`no-empty`; inline-скрипты HTML не проверяются.
-- Автотесты покрывают combat, PRNG/генерацию, gameplay lifecycle, boss arena, localStorage/валидацию и HTTP/security; browser/PWA и ручной tutorial остаются отдельными проверками.
+- Автотесты покрывают combat, PRNG/генерацию, контракт кампании из 30 уровней, gameplay lifecycle, boss arena, localStorage/валидацию и HTTP/security; browser/PWA и ручной tutorial остаются отдельными проверками.
 
 ## Важные ограничения
 

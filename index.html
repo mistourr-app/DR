@@ -136,10 +136,16 @@
         }
         #level-buttons-container {
             display: flex;
-            flex-direction: column-reverse;
+            flex-direction: column;
             align-items: stretch;
             width: 80%;
             max-width: 320px;
+            max-height: 100%;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            touch-action: pan-y;
+            -webkit-overflow-scrolling: touch;
         }
         .overlay {
             position: absolute;
@@ -261,11 +267,10 @@
         <div id="inventory-display"></div>
     </div>
     
-    <div id="version">v25</div>
+    <div id="version">v26</div>
 
     <div id="level-select-screen" class="overlay level-select" style="display: none;">
-        <h2 id="level-select-title" style="cursor: pointer; user-select: none;">ВЫБОР УРОВНЯ</h2>
-        <p class="text-slate-500 mb-4">Выберите сектор для развертывания</p>
+        <h2 id="level-select-title" style="cursor: pointer; user-select: none;">SELECT DUNGEON</h2>
         <div id="level-buttons-container"></div>
     </div>
 
@@ -321,7 +326,7 @@
         </div>
     </div>
 
-    <script type="module" src="main.js?v=25"></script>
+    <script type="module" src="main.js?v=26"></script>
     <script type="module">
       // Устанавливаем цвет золота из registry.js
       import { CELL_DEFS, OBJECT_TYPES } from './registry.js';

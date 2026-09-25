@@ -104,6 +104,9 @@ export function showLevelSelectScreen(onLevelSelect) {
   hideAllScreens();
   if (levelSelectScreen) {
     levelSelectScreen.style.display = 'flex';
+    // Заголовок не должен наезжать на счётчик золота: отступ сверху равен высоте верхней панели.
+    const topBarOffset = topUiBar ? topUiBar.offsetHeight : 0;
+    levelSelectScreen.style.paddingTop = `${topBarOffset + 20}px`;
     applyAssetBackground(levelSelectScreen, 'ui.screen.level-select');
 
     const container = document.getElementById('level-buttons-container');
@@ -133,7 +136,7 @@ export function showLevelSelectScreen(onLevelSelect) {
 
     // Пересоздаем кнопки каждый раз для обновления порядка
     container.innerHTML = '';
-    // Фильтруем скрытые уровни, переворачиваем массив и снова переворачиваем при добавлении
+    // Скрытые уровни пропускаем. Список перевёрнут: последний уровень вверху, первый внизу.
     const visibleLevels = orderedLevels.filter(level => !level.hidden).reverse();
     visibleLevels.forEach(level => {
       const button = document.createElement('button');
@@ -141,8 +144,10 @@ export function showLevelSelectScreen(onLevelSelect) {
       button.innerText = `${level.name} (${level.rows} рядов)`;
       button.className = 'button';
       button.addEventListener('click', () => onLevelSelect(level.id));
-      container.insertBefore(button, container.firstChild);
+      container.appendChild(button);
     });
+    // Обучение лежит внизу списка, поэтому открываем меню сразу на нём.
+    container.scrollTop = container.scrollHeight;
   }
 }
 

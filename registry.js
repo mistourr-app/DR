@@ -1,9 +1,9 @@
 // Версия данных - увеличивайте при изменении уровней, врагов или баланса
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3;
 
-// Временное хранилище данных об уровнях.
-// В будущем это будет загружаться из localStorage или сервера.
-export const LEVELS = [
+// Уровни, заданные вручную: обучение и отладочные полигоны.
+// Кампания Dungeon 1..30 генерируется из CAMPAIGN_CURVE.
+const STATIC_LEVELS = [
   {
     "id": "tutorial",
     "rows": 13,
@@ -192,56 +192,65 @@ export const LEVELS = [
       "DEFENSE_BONUS": 0,
       "GOLD": 0
     }
-  },
-  {
-    "id": "sector_1",
-    "rows": 30,
-    "name": "Сектор 1",
-    "bossHpMultiplier": 1.2,
-    "chances": {
-      "ENEMY": 0.1,
-      "WALL": 0.15,
-      "HEAL": 0.06,
-      "AMMO": 0.05,
-      "ENERGY": 0.06,
-      "ATTACK_BONUS": 0.05,
-      "DEFENSE_BONUS": 0.06,
-      "GOLD": 0.03
-    }
-  },
-  {
-    "id": "sector_2",
-    "rows": 50,
-    "name": "Сектор 2",
-    "bossHpMultiplier": 1.5,
-    "chances": {
-      "ENEMY": 0.15,
-      "WALL": 0.4,
-      "HEAL": 0.05,
-      "AMMO": 0.05,
-      "ENERGY": 0.05,
-      "ATTACK_BONUS": 0.05,
-      "DEFENSE_BONUS": 0.05,
-      "GOLD": 0.03
-    }
-  },
-  {
-    "id": "core",
-    "rows": 75,
-    "name": "Ядро",
-    "bossHpMultiplier": 5,
-    "chances": {
-      "ENEMY": 0.2,
-      "WALL": 0.15,
-      "HEAL": 0.05,
-      "AMMO": 0.04,
-      "ENERGY": 0.04,
-      "ATTACK_BONUS": 0.03,
-      "DEFENSE_BONUS": 0.03,
-      "GOLD": 0.03
-    }
   }
 ];
+
+// Кривая сложности кампании: линейная интерполяция между первым и последним уровнем.
+// from - значение на Dungeon 1, to - значение на Dungeon 30.
+export const CAMPAIGN_CURVE = {
+  total: 30,
+  idPrefix: 'dungeon_',
+  rows: { from: 30, to: 75 },
+  bossHpMultiplier: { from: 1.2, to: 5 },
+  chances: {
+    ENEMY: { from: 0.1, to: 0.2 },
+    WALL: { from: 0.15, to: 0.3 },
+    HEAL: { from: 0.06, to: 0.05 },
+    AMMO: { from: 0.05, to: 0.04 },
+    ENERGY: { from: 0.06, to: 0.04 },
+    ATTACK_BONUS: { from: 0.05, to: 0.03 },
+    DEFENSE_BONUS: { from: 0.06, to: 0.03 },
+    GOLD: { from: 0.03, to: 0.03 },
+  },
+};
+
+function roundChance(value) {
+  return Math.round(value * 10000) / 10000;
+}
+
+function buildCampaignLevels(curve) {
+  const lastIndex = curve.total - 1;
+  const levels = [];
+
+  for (let index = 0; index < curve.total; index += 1) {
+    // Линейный прогресс: 0 на первом уровне, 1 на последнем.
+    const progress = lastIndex === 0 ? 0 : index / lastIndex;
+    const lerp = ({ from, to }) => from + (to - from) * progress;
+    const chances = {};
+
+    Object.keys(curve.chances).forEach((key) => {
+      chances[key] = roundChance(lerp(curve.chances[key]));
+    });
+
+    const number = index + 1;
+    levels.push({
+      id: `${curve.idPrefix}${String(number).padStart(2, '0')}`,
+      rows: Math.round(lerp(curve.rows)),
+      name: `Dungeon ${number}`,
+      difficulty: number,
+      bossHpMultiplier: roundChance(lerp(curve.bossHpMultiplier)),
+      chances,
+    });
+  }
+
+  return levels;
+}
+
+export const CAMPAIGN_LEVELS = buildCampaignLevels(CAMPAIGN_CURVE);
+
+// Временное хранилище данных об уровнях.
+// В будущем это будет загружаться из localStorage или сервера.
+export const LEVELS = [...STATIC_LEVELS, ...CAMPAIGN_LEVELS];
 
 export const LEVEL_CHANCE_KEYS = [
   'ENEMY',

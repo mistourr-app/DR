@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dungeon-crawler-v25';
+const CACHE_NAME = 'dungeon-crawler-v26';
 const FILES_TO_CACHE = [
   './',
   './index.html',
@@ -8,7 +8,7 @@ const FILES_TO_CACHE = [
   './icon-512.png',
   './styles.css',
   './main.js',
-  './main.js?v=25',
+  './main.js?v=26',
   './state.js',
   './config.js',
   './ui.js',
@@ -77,15 +77,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Stale-while-revalidate: отдаём кэш сразу, но обновляем его в фоне,
+  // поэтому правка JS/HTML попадает в игру уже со следующей загрузки
+  // без ручного поднятия версии кэша.
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const cachedResponse = await cache.match(request);
+      const updateRequest = fetch(request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === 'basic') {
+            cache.put(request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => null);
+
       if (cachedResponse) return cachedResponse;
-      return fetch(request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') return response;
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        return response;
-      });
+      const networkResponse = await updateRequest;
+      if (networkResponse) return networkResponse;
+      return new Response('', { status: 504, statusText: 'Gateway Timeout' });
     })
   );
 });
