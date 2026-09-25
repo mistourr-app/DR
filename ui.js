@@ -1,5 +1,27 @@
 import { LEVELS, CELL_DEFS, OBJECT_TYPES } from './registry.js';
 import { getGameState } from './state.js';
+import { scheduleRunCallback } from './animation.js';
+
+function readStorageJson(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    if (!value) return fallback;
+    const parsed = JSON.parse(value);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+}
 
 // Получаем ссылки на все оверлеи один раз
 const levelSelectScreen = document.getElementById('level-select-screen');
@@ -28,7 +50,8 @@ export function updateGoldCounter() {
   const goldAmount = document.getElementById('gold-amount');
   if (goldAmount) {
     const { metaState, runState } = getGameState();
-    const totalGold = metaState.gold + (runState?.goldCollected || 0);
+    const pendingGold = runState && !runState.goldCommitted ? (runState.goldCollected || 0) : 0;
+    const totalGold = metaState.gold + pendingGold;
     goldAmount.textContent = totalGold;
   }
 }
@@ -45,29 +68,26 @@ export function showLevelSelectScreen(onLevelSelect) {
     const container = document.getElementById('level-buttons-container');
     if (!container) return;
 
-    // Загружаем порядок уровней из localStorage
     let orderedLevels = [...LEVELS];
-    const order = localStorage.getItem('levelOrder');
-    if (order) {
-      const ids = JSON.parse(order);
+    const order = readStorageJson('levelOrder', []);
+    if (Array.isArray(order)) {
       const ordered = [];
-      ids.forEach(id => {
-        const level = LEVELS.find(l => l.id === id);
+      order.forEach(id => {
+        const level = LEVELS.find(candidate => candidate.id === id);
         if (level) ordered.push(level);
       });
-      LEVELS.forEach(l => {
-        if (!ordered.find(ol => ol.id === l.id)) ordered.push(l);
+      LEVELS.forEach(level => {
+        if (!ordered.some(item => item.id === level.id)) ordered.push(level);
       });
       orderedLevels = ordered;
     }
 
-    // Загружаем видимость уровней из localStorage
-    const visibility = localStorage.getItem('levelVisibility');
-    if (visibility) {
-      const hidden = JSON.parse(visibility);
-      orderedLevels.forEach(l => {
-        l.hidden = hidden[l.id] || false;
-      });
+    const visibility = readStorageJson('levelVisibility', {});
+    if (visibility && typeof visibility === 'object' && !Array.isArray(visibility)) {
+      orderedLevels = orderedLevels.map(level => ({
+        ...level,
+        hidden: level.hidden === true || visibility[level.id] === true,
+      }));
     }
 
     // Пересоздаем кнопки каждый раз для обновления порядка
@@ -114,14 +134,16 @@ export function renderTopBar(runState, onExit) {
     // Слоты для бонусов атаки босса
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.attackBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, true) : createSlot('-', 'Атака', '#6b7280', true, null, true);
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, null, true) : createSlot('-', 'Атака', '#6b7280', true, null, null, true);
     }
     // Слоты для бонусов защиты босса
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.defenseBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, true) : createSlot('-', 'Защита', '#6b7280', true, null, true);
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, true) : createSlot('-', 'Защита', '#6b7280', true, null, null, true);
     }
     bossInventoryDisplay.innerHTML = bossInventoryHtml;
+  } else if (bossInventoryDisplay) {
+    bossInventoryDisplay.innerHTML = '';
   }
 
   // Обновляем динамические данные (счетчик рядов)
@@ -136,6 +158,7 @@ export function renderTopBar(runState, onExit) {
 export function resetTopBar() {
   if (topUiBar) {
     topUiBar.dataset.initialized = '';
+    topUiBar.innerHTML = '';
   }
 }
 
@@ -152,15 +175,20 @@ export function resetTopBar() {
 function createSlot(value, label, valueColor = '#ffffff', isEmpty = false, secondaryValue = null, secondaryColor = null, isSmall = false) {
   const emptyClass = isEmpty ? 'opacity-40' : '';
   const sizeClasses = isSmall ? 'w-12 h-12' : 'w-16 h-16';
+  const safeValue = escapeHtml(value);
+  const safeLabel = escapeHtml(label);
+  const safeSecondaryValue = secondaryValue === null || secondaryValue === undefined ? '' : escapeHtml(secondaryValue);
+  const safeValueColor = /^#[0-9a-f]{3,8}$/i.test(valueColor) ? valueColor : '#ffffff';
+  const safeSecondaryColor = /^#[0-9a-f]{3,8}$/i.test(secondaryColor || '') ? secondaryColor : '#d1d5db';
   // Обертка для слота и его подписи
   return `
     <div class="flex flex-col items-center">
       <div class="flex flex-col items-center justify-center ${sizeClasses} bg-gray-800 border border-gray-600 rounded-md p-1 ${emptyClass}">
-        <span class="text-2xl font-black leading-tight" style="color: ${valueColor};">${value}</span>
+        <span class="text-2xl font-black leading-tight" style="color: ${safeValueColor};">${safeValue}</span>
         <!-- Вторичный текст, используется для зарядов арбалета -->
-        ${secondaryValue ? `<span class="text-xs font-bold" style="color: ${secondaryColor || '#d1d5db'};">${secondaryValue}</span>` : ''}
+        ${safeSecondaryValue ? `<span class="text-xs font-bold" style="color: ${safeSecondaryColor};">${safeSecondaryValue}</span>` : ''}
       </div>
-      <span class="text-xs uppercase text-gray-400 font-semibold mt-1">${label}</span>
+      <span class="text-xs uppercase text-gray-400 font-semibold mt-1">${safeLabel}</span>
     </div>
   `;
 }
@@ -228,9 +256,9 @@ export function showGameOverScreen(onRestart, onGoToMenu, deathType = 'damage') 
     gameOverScreen.style.display = 'flex';
     gameOverScreen.style.opacity = '0';
     
-    setTimeout(() => {
+    scheduleRunCallback(800, () => {
       gameOverScreen.style.opacity = '1';
-    }, 800); // Задержка 800мс
+    });
 
     // Используем тот же подход с cloneNode, чтобы всегда иметь свежие колбэки
     const restartBtn = document.getElementById('restart-level-btn');

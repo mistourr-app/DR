@@ -3,23 +3,31 @@ import { DATA_VERSION } from './registry.js';
 
 const META_STORAGE_KEY = 'dcc_meta';
 const DATA_VERSION_KEY = 'dcc_data_version';
+const LEVEL_ORDER_KEY = 'levelOrder';
+const LEVEL_VISIBILITY_KEY = 'levelVisibility';
 
-// Состояние всего приложения
 const gameState = {
   appState: AppState.BOOT,
-  
-  // Состояние текущего забега (очищается между забегами)
   runState: null,
-
-  // Состояние мета-прогрессии (сохраняется)
   metaState: {
     gold: 0,
     upgrades: {},
   },
 };
 
+let nextRunId = 0;
+
 export function getGameState() {
   return gameState;
+}
+
+export function createRunId() {
+  nextRunId += 1;
+  return nextRunId;
+}
+
+export function isRunActive(runId) {
+  return Boolean(runId && gameState.runState?.runId === runId);
 }
 
 export function setAppState(newState, onStateChangeCallback = () => {}) {
@@ -28,7 +36,6 @@ export function setAppState(newState, onStateChangeCallback = () => {}) {
 
   console.log(`State changed: ${oldState} -> ${newState}`);
   
-  // Очищаем runState ДО изменения состояния, чтобы рендер не успел отрисовать старый уровень
   if (newState === AppState.META_HUB) {
     gameState.runState = null;
   }
@@ -37,30 +44,70 @@ export function setAppState(newState, onStateChangeCallback = () => {}) {
   onStateChangeCallback(newState, oldState);
 }
 
-export function loadMetaState() {
-  // Проверяем версию данных
-  const savedVersion = localStorage.getItem(DATA_VERSION_KEY);
-  const currentVersion = String(DATA_VERSION);
-  
-  if (savedVersion !== currentVersion) {
-    console.log(`Data version changed: ${savedVersion} -> ${currentVersion}. Clearing cache...`);
-    // Очищаем все данные кроме мета-прогресса
-    localStorage.removeItem('levelOrder');
-    localStorage.removeItem('levelVisibility');
-    localStorage.setItem(DATA_VERSION_KEY, currentVersion);
+function getStorage() {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
   }
+}
+
+function normalizeMetaState(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const gold = Number(source.gold);
+  return {
+    gold: Number.isFinite(gold) && gold >= 0 ? gold : 0,
+    upgrades: source.upgrades && typeof source.upgrades === 'object' && !Array.isArray(source.upgrades)
+      ? source.upgrades
+      : {},
+  };
+}
+
+export function loadMetaState() {
+  const storage = getStorage();
+  if (!storage) return;
+
+  try {
+    const savedVersion = storage.getItem(DATA_VERSION_KEY);
+    const currentVersion = String(DATA_VERSION);
   
-  const savedMeta = localStorage.getItem(META_STORAGE_KEY);
-  if (savedMeta) {
-    gameState.metaState = JSON.parse(savedMeta);
+    if (savedVersion !== currentVersion) {
+      console.log(`Data version changed: ${savedVersion} -> ${currentVersion}. Clearing cache...`);
+      storage.removeItem(LEVEL_ORDER_KEY);
+      storage.removeItem(LEVEL_VISIBILITY_KEY);
+      storage.setItem(DATA_VERSION_KEY, currentVersion);
+    }
+  } catch (error) {
+    console.warn('Unable to read saved data version', error);
+  }
+
+  try {
+    const savedMeta = storage.getItem(META_STORAGE_KEY);
+    if (savedMeta) {
+      gameState.metaState = normalizeMetaState(JSON.parse(savedMeta));
+    } else {
+      gameState.metaState = normalizeMetaState(null);
+    }
+  } catch (error) {
+    gameState.metaState = normalizeMetaState(null);
+    console.warn('Saved metadata is invalid and was ignored', error);
   }
 }
 
 export function saveMetaState() {
-  localStorage.setItem(META_STORAGE_KEY, JSON.stringify(gameState.metaState));
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(META_STORAGE_KEY, JSON.stringify(normalizeMetaState(gameState.metaState)));
+  } catch (error) {
+    console.warn('Unable to save metadata', error);
+  }
 }
 
 export function addGold(amount) {
-  gameState.metaState.gold += amount;
-  saveMetaState();
+  const value = Number(amount);
+  if (Number.isFinite(value) && value > 0) {
+    gameState.metaState.gold += value;
+    saveMetaState();
+  }
 }

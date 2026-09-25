@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Dungeon Card Crawler</title>
     <meta name="theme-color" content="#090a0c">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     <style>
@@ -261,7 +261,7 @@
         <div id="inventory-display"></div>
     </div>
     
-    <div id="version">v23</div>
+    <div id="version">v24</div>
 
     <div id="level-select-screen" class="overlay level-select" style="display: none;">
         <h2 id="level-select-title" style="cursor: pointer; user-select: none;">ВЫБОР УРОВНЯ</h2>
@@ -293,7 +293,7 @@
         <div id="editor-level-list" class="w-full max-w-md my-4"></div>
         <div>
             <button id="create-new-level-btn" class="button primary">Создать уровень</button>
-            <button class="button" onclick="showLevelSelect()">Назад</button>
+            <button class="button" onclick="window.location.href='index.html'">Назад</button>
         </div>
     </div>
 
@@ -321,7 +321,7 @@
         </div>
     </div>
 
-    <script type="module" src="main.js?v=23"></script>
+    <script type="module" src="main.js?v=24"></script>
     <script type="module">
       // Устанавливаем цвет золота из registry.js
       import { CELL_DEFS, OBJECT_TYPES } from './registry.js';

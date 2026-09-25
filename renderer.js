@@ -30,14 +30,15 @@ export function initRenderer(canvasContext) {
 /**
  * Отрисовывает текущее состояние забега (игрок, сетка и т.д.)
  */
-export function renderRun() {
+export function renderRun(deltaTime = 1000 / 60) {
   const state = getGameState();
   const { runState } = state;
   if (!runState) return;
 
-  // Плавное движение камеры
+  const frameScale = Math.max(0.1, Math.min(4, Number(deltaTime) || (1000 / 60)) / (1000 / 60));
+  const cameraLerp = 1 - Math.pow(0.85, frameScale);
   if (Math.abs(runState.targetScrollY - runState.scrollY) > 0.1) {
-    runState.scrollY += (runState.targetScrollY - runState.scrollY) * 0.15;
+    runState.scrollY += (runState.targetScrollY - runState.scrollY) * cameraLerp;
   } else {
     runState.scrollY = runState.targetScrollY;
   }
@@ -127,9 +128,6 @@ export function renderRun() {
     }
   });
 
-  // Отрисовка тактических элементов (линия выстрела)
-  renderTacticalElements(scrollY);
-
   // Отрисовка игрока (всегда, даже если HP <= 0)
   const playerCellHeight = getCellHeight(player.pos.y, runState.totalRows);
   const playerCellY = ctx.canvas.height - (getRowY(player.pos.y, runState.totalRows) - scrollY) - playerCellHeight;
@@ -150,6 +148,8 @@ export function renderRun() {
     const bossDrawY = bossCellY;
     drawBossCard(bossDrawX, bossDrawY);
   }
+
+  renderTacticalElements(scrollY);
 
   // Pass 3: Отрисовываем всплывающий текст поверх всего
   renderFloatingTexts(scrollY);
@@ -297,11 +297,12 @@ function drawThreatHighlight(x, y, gx, gy, idleThreatMap, alertThreatMap) {
   const w = DIMS.CELL_SIZE - pad * 2;
   const h = getCellHeight(gy, totalRows) - pad * 2;
 
-  // Проверяем, есть ли подсветка для этой клетки
-  const hasAlert = alertThreatMap.has(`${gx},${gy}`);
-  const hasIdle = idleThreatMap.has(`${gx},${gy}`);
+  const cellKey = `${gx},${gy}`;
+  const idleCount = idleThreatMap.get(cellKey)?.size || 0;
+  const alertCount = alertThreatMap.get(cellKey)?.size || 0;
+  const totalCount = idleCount + alertCount;
   
-  if (!hasAlert && !hasIdle) return;
+  if (totalCount === 0) return;
 
   ctx.save();
   ctx.translate(x + pad, y + pad);
@@ -309,13 +310,10 @@ function drawThreatHighlight(x, y, gx, gy, idleThreatMap, alertThreatMap) {
   ctx.beginPath();
   ctx.roundRect(0, 0, w, h, 8);
 
-  // Подсветка с 15% прозрачностью, может наслаиваться
-  // Приоритет: оранжевая (alert) > красная (idle)
-  if (hasAlert) {
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.15)'; // Orange-400 с 15% прозрачностью
-  } else {
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)'; // Red-500 с 15% прозрачностью
-  }
+  const alpha = Math.min(0.45, 0.15 * totalCount);
+  ctx.fillStyle = alertCount > 0
+    ? `rgba(245, 158, 11, ${alpha})`
+    : `rgba(239, 68, 68, ${alpha})`;
   
   ctx.fill();
   ctx.restore();
@@ -396,7 +394,7 @@ function renderTacticalElements(scrollY) {
     const bossX = boss.pos.x;
     const distance = Math.abs(bossX - playerX);
 
-    if (distance > 0 && distance <= player.inventory.weapon.range) {
+    if (distance <= player.inventory.weapon.range) {
       const bossCell = rows[boss.pos.y][boss.pos.x];
 
       ctx.save();

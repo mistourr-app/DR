@@ -1,11 +1,14 @@
-const CACHE_NAME = 'dungeon-crawler-v22';
+const CACHE_NAME = 'dungeon-crawler-v24';
 const FILES_TO_CACHE = [
   './',
   './index.html',
+  './admin.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
+  './styles.css',
   './main.js',
+  './main.js?v=24',
   './state.js',
   './config.js',
   './ui.js',
@@ -17,51 +20,53 @@ const FILES_TO_CACHE = [
   './enemyAI.js',
   './bossAI.js',
   './events.js',
-  './utils.js'
+  './utils.js',
+  './tutorial.js',
 ];
 
-self.addEventListener('install', (evt) => {
-  evt.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(FILES_TO_CACHE);
-    })
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(FILES_TO_CACHE))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
-self.addEventListener('activate', (evt) => {
-  evt.waitUntil(
-    caches.keys().then((keyList) => {
-      return Promise.all(
-        keyList.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  const requestUrl = new URL(request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
         })
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', (evt) => {
-  if (evt.request.url.includes('cdn.tailwindcss.com')) {
+        .catch(() => caches.match(request).then((cachedResponse) => cachedResponse || caches.match('./index.html')))
+    );
     return;
   }
 
-  evt.respondWith(
-    caches.match(evt.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(evt.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(evt.request, responseToCache);
-        });
+  event.respondWith(
+    caches.match(request).then((cachedResponse) => {
+      if (cachedResponse) return cachedResponse;
+      return fetch(request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') return response;
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
       });
     })

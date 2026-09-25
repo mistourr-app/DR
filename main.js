@@ -1,9 +1,10 @@
 import { AppState, DIMS } from './config.js';
+import { getLevelById } from './registry.js';
 import { getGameState, setAppState, loadMetaState, addGold } from './state.js';
 import { showLevelSelectScreen, hideAllScreens, showGameOverScreen, showVictoryScreen, renderUi, renderTopBar, resetTopBar, updateGoldCounter } from './ui.js';
-import { startRun, processPlayerAction, initRun, getDeathType } from './run.js';
+import { startRun, processPlayerAction, initRun, getDeathType, resizeRunVisuals } from './run.js';
 import { initRenderer, renderRun } from './renderer.js';
-import { updateAnimations, isAnimating } from './animation.js';
+import { updateAnimations, isAnimating, clearAnimations } from './animation.js';
 import { isClickAllowed, stopTutorial } from './tutorial.js';
 
 const canvas = document.getElementById('gameCanvas');
@@ -17,9 +18,10 @@ let lastTime = 0;
 function resize() {
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
+  const previousCellSize = getGameState().runState?.visualCellSize || DIMS.CELL_SIZE;
 
   const availableHeight = screenH - DIMS.TOP_UI_H - DIMS.BOTTOM_UI_H;
-  const size = Math.floor(Math.min(screenW / DIMS.COLS, availableHeight / (DIMS.VISIBLE_ROWS + 1)));
+  const size = Math.max(1, Math.floor(Math.min(screenW / DIMS.COLS, availableHeight / (DIMS.VISIBLE_ROWS + 1))));
   
   DIMS.CELL_SIZE = size;
   DIMS.CANVAS_WIDTH = DIMS.COLS * DIMS.CELL_SIZE;
@@ -27,6 +29,7 @@ function resize() {
 
   canvas.width = DIMS.CANVAS_WIDTH;
   canvas.height = DIMS.CANVAS_HEIGHT;
+  resizeRunVisuals(previousCellSize);
 
   document.getElementById('top-ui-bar').style.height = `${DIMS.TOP_UI_H}px`;
   document.getElementById('bottom-ui-bar').style.height = `${DIMS.BOTTOM_UI_H}px`;
@@ -38,38 +41,42 @@ function resize() {
  */
 function onStateChange(newState, oldState) {
   hideAllScreens();
+  resetTopBar();
 
   switch (newState) {
     case AppState.META_HUB:
       showLevelSelectScreen((levelId) => {
-        startRun(levelId);
-        resetTopBar();
-        setAppState(AppState.RUN_PLAYING, onStateChange);
+        if (startRun(levelId)) {
+          resetTopBar();
+          setAppState(AppState.RUN_PLAYING, onStateChange);
+        }
       });
       break;
     case AppState.RUN_SUMMARY: {
       const state = getGameState();
       const lastRunLevelId = state.runState?.levelId;
       const goldCollected = state.runState?.goldCollected || 0;
-      
+
       // Сохраняем золото при смерти
       if (goldCollected > 0) {
         addGold(goldCollected);
       }
-      
+      if (state.runState) state.runState.goldCommitted = true;
+
       const deathType = getDeathType();
       showGameOverScreen(
         () => { // onRestart
-          if (lastRunLevelId) {
-            startRun(lastRunLevelId);
+          if (lastRunLevelId && startRun(lastRunLevelId)) {
             setAppState(AppState.RUN_PLAYING, onStateChange);
           }
         },
         () => { // onGoToMenu
+          clearAnimations();
           stopTutorial();
-          const url = new URL(window.location);
-          url.searchParams.delete('seed');
-          window.history.pushState({}, '', url);
+         const url = new URL(window.location);
+         url.searchParams.delete('seed');
+         url.searchParams.delete('level');
+         window.history.pushState({}, '', url);
           setAppState(AppState.META_HUB, onStateChange);
         },
         deathType
@@ -79,16 +86,19 @@ function onStateChange(newState, oldState) {
     case AppState.RUN_VICTORY: {
       const state = getGameState();
       const goldCollected = state.runState?.goldCollected || 0;
-      
+
       // Сохраняем золото при победе
       if (goldCollected > 0) {
         addGold(goldCollected);
       }
-      
+      if (state.runState) state.runState.goldCommitted = true;
+
       showVictoryScreen(() => { // onGoToMenu
+        clearAnimations();
         stopTutorial();
         const url = new URL(window.location);
         url.searchParams.delete('seed');
+        url.searchParams.delete('level');
         window.history.pushState({}, '', url);
         setAppState(AppState.META_HUB, onStateChange);
       });
@@ -110,7 +120,7 @@ function update(deltaTime) {
   }
 }
 
-function render() {
+function render(deltaTime = 1000 / 60) {
   const state = getGameState();
   
   // Обновляем счётчик золота на каждом кадре
@@ -129,23 +139,25 @@ function render() {
   switch (state.appState) {
     case AppState.RUN_PLAYING:
       renderTopBar(state.runState, () => {
+        clearAnimations();
         // Останавливаем туториал при выходе в меню
         stopTutorial();
         const url = new URL(window.location);
         url.searchParams.delete('seed');
+           url.searchParams.delete('level');
         window.history.pushState({}, '', url);
         setAppState(AppState.META_HUB, onStateChange);
       });
-      renderRun();
+      renderRun(deltaTime);
       renderUi(state.runState);
       break;
     case AppState.RUN_SUMMARY:
       if (state.runState) {
-        renderRun();
+        renderRun(deltaTime);
       }
       break;
     case AppState.RUN_VICTORY:
-      renderRun();
+      renderRun(deltaTime);
   }
 }
 
@@ -180,7 +192,7 @@ function gameLoop(time = 0) {
   const deltaTime = time - lastTime;
   lastTime = time;
   update(deltaTime);
-  render();
+  render(deltaTime);
   requestAnimationFrame(gameLoop);
 }
 
@@ -193,15 +205,19 @@ initRenderer(ctx);
 initRun(onStateChange); // Передаём callback в run.js для вызова showGameOverScreen/showVictoryScreen
 
 loadMetaState();
-setAppState(AppState.META_HUB, onStateChange);
+const requestedLevelId = new URLSearchParams(window.location.search).get('level');
+if (requestedLevelId && getLevelById(requestedLevelId) && startRun(requestedLevelId)) {
+  resetTopBar();
+  setAppState(AppState.RUN_PLAYING, onStateChange);
+} else {
+  setAppState(AppState.META_HUB, onStateChange);
+}
 gameLoop();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      for (let registration of registrations) {
-        registration.unregister();
-      }
+    navigator.serviceWorker.register('./sw.js').catch((error) => {
+      console.warn('Service worker registration failed', error);
     });
   });
 }

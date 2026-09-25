@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Админка - Управление уровнями</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css">
   <style>
     .dragging { opacity: 0.5; }
     .drag-over { border-top: 3px solid #3b82f6; }
@@ -48,11 +48,11 @@
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Количество рядов</label>
-            <input id="new-level-rows" type="number" class="w-full px-3 py-2 bg-gray-700 rounded" value="30" min="6">
+            <input id="new-level-rows" type="number" class="w-full px-3 py-2 bg-gray-700 rounded" value="30" min="3" max="100">
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Множитель HP босса</label>
-            <input id="new-level-boss-hp" type="number" step="0.1" class="w-full px-3 py-2 bg-gray-700 rounded" value="2.5" min="1">
+            <input id="new-level-boss-hp" type="number" step="0.1" class="w-full px-3 py-2 bg-gray-700 rounded" value="2.5" min="0.1" max="100">
           </div>
           <div class="flex gap-2">
             <button id="create-level-btn" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded">Создать</button>
@@ -64,42 +64,64 @@
   </div>
 
   <script type="module">
-    import { LEVELS } from './registry.js';
+    import { LEVELS, validateLevelDefinition } from './registry.js';
 
     let currentLevels = [...LEVELS];
     let selectedLevel = null;
     let draggedIndex = null;
 
+    function readStorageJson(key, fallback) {
+      try {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[character]);
+    }
+
     function loadLevelOrder() {
-      const order = localStorage.getItem('levelOrder');
-      if (order) {
-        const ids = JSON.parse(order);
+      const order = readStorageJson('levelOrder', []);
+      if (Array.isArray(order)) {
         const ordered = [];
-        ids.forEach(id => {
-          const level = currentLevels.find(l => l.id === id);
+        order.forEach(id => {
+          const level = currentLevels.find(candidate => candidate.id === id);
           if (level) ordered.push(level);
         });
-        currentLevels.forEach(l => {
-          if (!ordered.find(ol => ol.id === l.id)) ordered.push(l);
+        currentLevels.forEach(level => {
+          if (!ordered.some(item => item.id === level.id)) ordered.push(level);
         });
         currentLevels = ordered;
       }
-      
-      const visibility = localStorage.getItem('levelVisibility');
-      if (visibility) {
-        const hidden = JSON.parse(visibility);
-        currentLevels.forEach(l => {
-          if (hidden[l.id]) l.hidden = true;
-        });
+
+      const visibility = readStorageJson('levelVisibility', {});
+      if (visibility && typeof visibility === 'object' && !Array.isArray(visibility)) {
+        currentLevels = currentLevels.map(level => ({
+          ...level,
+          hidden: level.hidden === true || visibility[level.id] === true,
+        }));
       }
     }
 
     function saveLevelOrder() {
-      localStorage.setItem('levelOrder', JSON.stringify(currentLevels.map(l => l.id)));
-      localStorage.setItem('levelVisibility', JSON.stringify(currentLevels.reduce((acc, l) => {
-        if (l.hidden) acc[l.id] = true;
-        return acc;
-      }, {})));
+      try {
+        localStorage.setItem('levelOrder', JSON.stringify(currentLevels.map(level => level.id)));
+        localStorage.setItem('levelVisibility', JSON.stringify(currentLevels.reduce((acc, level) => {
+          if (level.hidden) acc[level.id] = true;
+          return acc;
+        }, {})));
+      } catch (error) {
+        console.warn('Unable to save level order', error);
+      }
     }
 
     function renderLevelsList() {
@@ -114,8 +136,8 @@
           <div class="flex items-center gap-2">
             <span class="text-2xl">${level.isTutorial ? '🔒' : '☰'}</span>
             <div>
-              <div class="font-bold ${level.hidden ? 'text-gray-400 line-through' : ''}">${level.name}${level.isTutorial ? ' (защищен)' : ''}</div>
-              <div class="text-sm text-gray-400">${level.rows} рядов • Boss HP x${level.bossHpMultiplier} ${level.hidden ? '• Скрыт' : ''}</div>
+              <div class="font-bold ${level.hidden ? 'text-gray-400 line-through' : ''}">${escapeHtml(level.name)}${level.isTutorial ? ' (защищен)' : ''}</div>
+               <div class="text-sm text-gray-400">${escapeHtml(level.rows)} рядов • Boss HP x${escapeHtml(level.bossHpMultiplier)} ${level.hidden ? '• Скрыт' : ''}</div>
             </div>
           </div>
           <div class="flex gap-2">
@@ -140,7 +162,7 @@
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const index = parseInt(btn.dataset.index);
-          window.location.href = `index.html?level=${currentLevels[index].id}`;
+           window.location.href = `index.html?level=${encodeURIComponent(currentLevels[index].id)}`;
         });
       });
 
@@ -226,19 +248,19 @@
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium mb-1">ID</label>
-            <input id="edit-id" type="text" value="${selectedLevel.id}" class="w-full px-3 py-2 bg-gray-700 rounded" readonly>
+             <input id="edit-id" type="text" value="${escapeHtml(selectedLevel.id)}" class="w-full px-3 py-2 bg-gray-700 rounded" readonly>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Название</label>
-            <input id="edit-name" type="text" value="${selectedLevel.name}" class="w-full px-3 py-2 bg-gray-700 rounded">
+             <input id="edit-name" type="text" value="${escapeHtml(selectedLevel.name)}" class="w-full px-3 py-2 bg-gray-700 rounded">
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Количество рядов</label>
-            <input id="edit-rows" type="number" value="${selectedLevel.rows}" class="w-full px-3 py-2 bg-gray-700 rounded" min="6">
+             <input id="edit-rows" type="number" value="${escapeHtml(selectedLevel.rows)}" class="w-full px-3 py-2 bg-gray-700 rounded" min="3" max="100">
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Множитель HP босса</label>
-            <input id="edit-boss-hp" type="number" step="0.1" value="${selectedLevel.bossHpMultiplier}" class="w-full px-3 py-2 bg-gray-700 rounded" min="1">
+             <input id="edit-boss-hp" type="number" step="0.1" value="${escapeHtml(selectedLevel.bossHpMultiplier)}" class="w-full px-3 py-2 bg-gray-700 rounded" min="0.1" max="100">
           </div>
           
           <div class="border-t border-gray-700 pt-4">
@@ -319,35 +341,39 @@
     }
 
     function saveLevel() {
-      const index = currentLevels.findIndex(l => l.id === selectedLevel.id);
-      
-      currentLevels[index] = {
+      const index = currentLevels.findIndex(level => level.id === selectedLevel.id);
+      const updatedLevel = {
         ...selectedLevel,
-        name: document.getElementById('edit-name').value,
-        rows: parseInt(document.getElementById('edit-rows').value),
-        bossHpMultiplier: parseFloat(document.getElementById('edit-boss-hp').value),
+        name: document.getElementById('edit-name').value.trim(),
+        rows: Number.parseInt(document.getElementById('edit-rows').value, 10),
+        bossHpMultiplier: Number.parseFloat(document.getElementById('edit-boss-hp').value),
         chances: selectedLevel.chances ? {
-          ENEMY: parseFloat(document.getElementById('edit-enemy').value) / 100,
-          WALL: parseFloat(document.getElementById('edit-wall').value) / 100,
-          HEAL: parseFloat(document.getElementById('edit-heal').value) / 100,
-          AMMO: parseFloat(document.getElementById('edit-ammo').value) / 100,
-          ENERGY: parseFloat(document.getElementById('edit-energy').value) / 100,
-          ATTACK_BONUS: parseFloat(document.getElementById('edit-attack-bonus').value) / 100,
-          DEFENSE_BONUS: parseFloat(document.getElementById('edit-defense-bonus').value) / 100,
-          GOLD: parseFloat(document.getElementById('edit-gold').value) / 100
+          ENEMY: Number.parseFloat(document.getElementById('edit-enemy').value) / 100,
+          WALL: Number.parseFloat(document.getElementById('edit-wall').value) / 100,
+          HEAL: Number.parseFloat(document.getElementById('edit-heal').value) / 100,
+          AMMO: Number.parseFloat(document.getElementById('edit-ammo').value) / 100,
+          ENERGY: Number.parseFloat(document.getElementById('edit-energy').value) / 100,
+          ATTACK_BONUS: Number.parseFloat(document.getElementById('edit-attack-bonus').value) / 100,
+          DEFENSE_BONUS: Number.parseFloat(document.getElementById('edit-defense-bonus').value) / 100,
+          GOLD: Number.parseFloat(document.getElementById('edit-gold').value) / 100
         } : undefined
       };
-
+      const validation = validateLevelDefinition(updatedLevel);
+      if (!validation.valid) {
+        alert(`❌ Проверьте уровень:\n${validation.errors.join('\n')}`);
+        return;
+      }
+      if (index < 0) return;
+      currentLevels[index] = updatedLevel;
+      selectedLevel = updatedLevel;
+      saveLevelOrder();
       alert('✅ Уровень сохранен! Скопируйте код через "Экспорт" и обновите registry.js');
       renderLevelsList();
     }
 
     function exportLevel() {
       const code = `export const LEVELS = ${JSON.stringify(currentLevels, null, 2)};`;
-      
-      navigator.clipboard.writeText(code).then(() => {
-        alert('📋 Код скопирован в буфер обмена! Вставьте его в registry.js');
-      }).catch(() => {
+      const fallbackCopy = () => {
         const textarea = document.createElement('textarea');
         textarea.value = code;
         document.body.appendChild(textarea);
@@ -355,7 +381,15 @@
         document.execCommand('copy');
         document.body.removeChild(textarea);
         alert('📋 Код скопирован! Вставьте его в registry.js');
-      });
+      };
+
+      if (typeof navigator.clipboard?.writeText === 'function') {
+        navigator.clipboard.writeText(code).then(() => {
+          alert('📋 Код скопирован в буфер обмена! Вставьте его в registry.js');
+        }).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
     }
 
     function deleteLevel(index) {
@@ -383,10 +417,10 @@
 
     document.getElementById('create-level-btn').addEventListener('click', () => {
       const newLevel = {
-        id: document.getElementById('new-level-id').value,
-        rows: parseInt(document.getElementById('new-level-rows').value),
-        name: document.getElementById('new-level-name').value,
-        bossHpMultiplier: parseFloat(document.getElementById('new-level-boss-hp').value),
+        id: document.getElementById('new-level-id').value.trim(),
+        rows: Number.parseInt(document.getElementById('new-level-rows').value, 10),
+        name: document.getElementById('new-level-name').value.trim(),
+        bossHpMultiplier: Number.parseFloat(document.getElementById('new-level-boss-hp').value),
         chances: {
           ENEMY: 0.1,
           WALL: 0.1,
@@ -398,6 +432,15 @@
           GOLD: 0.03
         }
       };
+      const validation = validateLevelDefinition(newLevel);
+      if (!validation.valid) {
+        alert(`❌ Проверьте уровень:\n${validation.errors.join('\n')}`);
+        return;
+      }
+      if (currentLevels.some(level => level.id === newLevel.id)) {
+        alert('❌ Уровень с таким ID уже существует');
+        return;
+      }
 
       currentLevels.push(newLevel);
       saveLevelOrder();

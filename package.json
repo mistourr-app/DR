@@ -1,0 +1,19 @@
+{
+  "name": "dungeon-card-crawler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "build:css": "tailwindcss -i ./src/input.css -o ./styles.css --minify",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "eslint": "^8.57.1",
+    "tailwindcss": "3.4.17",
+    "typescript": "^5.7.3"
+  }
+}

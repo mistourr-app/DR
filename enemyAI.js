@@ -98,9 +98,8 @@ export function getThreatMaps(rows, playerPos) {
     }
   }
 
-  // Конвертируем Map в Set для обратной совместимости с renderer
-  const idleThreatMap = new Set(idleThreatCells.keys());
-  const alertThreatMap = new Set(alertThreatCells.keys());
+  const idleThreatMap = idleThreatCells;
+  const alertThreatMap = alertThreatCells;
 
   cachedThreatMaps = { idleThreatMap, alertThreatMap };
   threatMapsDirty = false;

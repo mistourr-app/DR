@@ -1,5 +1,11 @@
 # Мета-геймплей и система прокачки
 
+## Статус
+
+Сейчас реализовано минимальное мета-состояние: золото за подбор и завершение забега сохраняется, а `upgrades` остаётся пустым заделом. Экипировка, уровни прокачки, разблокировки, crystals и experience ниже — roadmap, а не текущий игровой функционал.
+
+Фактическое хранение и границы roadmap описаны в `README.md` и `QWEN.md`. Золото из забега попадает в metaState только при завершении забега; crystals, experience, equipment и upgrade trees пока не реализованы.
+
 ## Концепция
 
 Мета-геймплей добавляет долгосрочную прогрессию между забегами. Игрок собирает валюту, прокачивает снаряжение и персонажа, разблокирует новый контент.
@@ -155,68 +161,34 @@ finalValue = 6 * (1 + 0.15) * (1.1) = 7.59 ≈ 8
 
 ## 4. Структура данных
 
-### 4.1 MetaState (расширение)
+### 4.1 MetaState (текущая реализация)
 
 ```javascript
 metaState: {
-  // Валюта
-  currency: {
-    gold: 0,
-    crystals: 0,
-    experience: 0
-  },
-  
-  // Уровень игрока
-  playerLevel: 1,
-  
-  // Прокачка игрока
-  playerUpgrades: {
-    maxHp: { level: 0, maxLevel: 10 },
-    maxEnergy: { level: 0, maxLevel: 10 },
-    consumableSlots: { level: 0, maxLevel: 5 },
-    healEfficiency: { level: 0, maxLevel: 5 },
-    energyEfficiency: { level: 0, maxLevel: 5 },
-    startingHp: { level: 0, maxLevel: 5 },
-    startingEnergy: { level: 0, maxLevel: 5 }
-  },
-  
-  // Коллекция снаряжения
-  equipment: {
-    crossbow_1: { id: 'crossbow_1', level: 1, unlocked: true },
-    sword_1: { id: 'sword_1', level: 0, unlocked: false },
-    armor_1: { id: 'armor_1', level: 1, unlocked: true },
-    ring_1: { id: 'ring_1', level: 0, unlocked: false }
-  },
-  
-  // Текущая экипировка (что взято в забег)
-  loadout: {
-    weapon: 'crossbow_1',
-    armor: 'armor_1',
-    accessory1: null,
-    accessory2: null
-  },
-  
-  // Статистика
-  stats: {
-    runsCompleted: 0,
-    runsWon: 0,
-    enemiesKilled: 0,
-    bossesDefeated: 0,
-    totalGoldEarned: 0,
-    totalDamageTaken: 0,
-    totalDamageDealt: 0
-  },
-  
-  // Разблокировки
-  unlocks: {
-    levels: ['level_1', 'tutorial'],
-    equipment: ['crossbow_1', 'armor_1'],
-    upgrades: ['maxHp', 'maxEnergy']
-  }
+  gold: 0,
+  upgrades: {},
 }
 ```
 
-### 4.2 Registry для снаряжения
+### 4.2 MetaState (планируемое расширение)
+
+Ниже — возможная структура после добавления отдельной системы прогрессии:
+
+```javascript
+metaState: {
+  gold: 0,
+  crystals: 0,
+  experience: 0,
+  playerLevel: 1,
+  playerUpgrades: {},
+  equipment: {},
+  loadout: {},
+  stats: {},
+  unlocks: {},
+}
+```
+
+### 4.3 Registry для снаряжения
 
 ```javascript
 // registry.js
@@ -295,7 +267,7 @@ export const EQUIPMENT_DEFS = {
 };
 ```
 
-### 4.3 Registry для прокачек игрока
+### 4.4 Registry для прокачек игрока
 
 ```javascript
 // registry.js
@@ -379,7 +351,7 @@ export const UPGRADE_DEFS = {
 };
 ```
 
-### 4.4 Конфигурация расходников
+### 4.5 Конфигурация расходников
 
 ```javascript
 // registry.js
@@ -483,6 +455,8 @@ export const CONSUMABLE_CONFIG = {
 ---
 
 ## 6. Порядок реализации
+
+> Текущий прогресс: базовое начисление и сохранение `gold` за подбор/завершение забега уже реализованы. Остальные пункты ниже описывают ещё не реализованную расширенную систему.
 
 ### Фаза 1: Подготовка данных
 - [ ] Расширить metaState новыми полями

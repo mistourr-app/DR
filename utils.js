@@ -1,14 +1,21 @@
 import { OBJECT_TYPES, CELL_DEFS } from './registry.js';
 
-export function createPRNG(seed) {
+const RANDOM_MODULUS = 233280;
+
+export function createPRNG(seed = Date.now()) {
+  const numericSeed = Number(seed);
+  let state = Number.isFinite(numericSeed) ? Math.trunc(numericSeed) : Date.now();
+  state = ((state % RANDOM_MODULUS) + RANDOM_MODULUS) % RANDOM_MODULUS;
+
   return function() {
-    seed = (seed * 9301 + 49297) % 233280;
-    return seed / 233280;
+    state = ((Math.imul(state, 9301) + 49297) % RANDOM_MODULUS + RANDOM_MODULUS) % RANDOM_MODULUS;
+    return state / RANDOM_MODULUS;
   };
 }
 
 export function generateArenaObject(x, y, totalRows, random, hpPercent = 1.0) {
   const isPlayerRow = y === totalRows - 2;
+  const randomValue = typeof random === 'function' ? random : createPRNG(x * 1000 + y * 17 + totalRows);
   
   const baseChances = { 
     ATTACK_CELL: 0.20, 
@@ -40,7 +47,7 @@ export function generateArenaObject(x, y, totalRows, random, hpPercent = 1.0) {
     normalizedChances[key] = chances[key] / totalChance;
   }
 
-  const rand = random();
+  const rand = randomValue();
   let cumulativeChance = 0;
 
   for (const key in normalizedChances) {
@@ -50,10 +57,9 @@ export function generateArenaObject(x, y, totalRows, random, hpPercent = 1.0) {
       if (type === OBJECT_TYPES.ATTACK_BONUS || type === OBJECT_TYPES.DEFENSE_BONUS) {
         data = { value: CELL_DEFS[type].value };
       } else if (type === OBJECT_TYPES.ATTACK_CELL) {
-        // Случайный урон от 5 до 15
         const minDamage = 5;
         const maxDamage = 10;
-        data = { value: Math.floor(random() * (maxDamage - minDamage + 1)) + minDamage };
+        data = { value: Math.floor(randomValue() * (maxDamage - minDamage + 1)) + minDamage };
       }
       return { type, data };
     }
@@ -62,14 +68,15 @@ export function generateArenaObject(x, y, totalRows, random, hpPercent = 1.0) {
   const fallbackType = OBJECT_TYPES.ATTACK_CELL;
   const minDamage = 5;
   const maxDamage = 10;
-  return { type: fallbackType, data: { value: Math.floor(random() * (maxDamage - minDamage + 1)) + minDamage } };
+  return { type: fallbackType, data: { value: Math.floor(randomValue() * (maxDamage - minDamage + 1)) + minDamage } };
 }
 
-// Заполняет пустую клетку арены новым объектом
-export function spawnArenaObject(cell, x, y, totalRows, hpPercent = 1.0) {
+export function spawnArenaObject(cell, x, y, totalRows, hpPercent = 1.0, random = null) {
   const prevType = cell.type;
-  const random = createPRNG(Date.now() + x * 1000 + y);
-  const { type, data } = generateArenaObject(x, y, totalRows, random, hpPercent);
+  const randomValue = typeof random === 'function'
+    ? random
+    : createPRNG(x * 1000 + y * 17 + totalRows);
+  const { type, data } = generateArenaObject(x, y, totalRows, randomValue, hpPercent);
   cell.type = type;
   cell.data = data;
   cell.visual.alpha = 1.0;

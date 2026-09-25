@@ -1,0 +1,22 @@
+{
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "extends": "eslint:recommended",
+  "rules": {
+    "no-case-declarations": "off",
+    "no-constant-condition": "off",
+    "no-empty": "off",
+    "no-unused-vars": "off"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "styles.css"
+  ]
+}

@@ -1,7 +1,7 @@
-import { getGameState, setAppState } from './state.js';
-import { getLevelById, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS } from './registry.js';
+import { getGameState, setAppState, createRunId, isRunActive } from './state.js';
+import { getLevelById, validateLevelDefinition, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS } from './registry.js';
 import { DIMS, AppState } from './config.js';
-import { play } from './animation.js';
+import { play, clearAnimations, scheduleRunCallback, resizeAnimations } from './animation.js';
 import { Events, emit, clear as clearEvents } from './events.js';
 import { dealDamageToEnemy, dealDamageToBoss, processMeleeCombat, dealDamageToPlayer, initCombat, processPlayerMeleeOnBoss, calculateAndConsumeAttackBonuses } from './combat.js';
 import { cleanupDeadEnemies, processEnemyTurns, markThreatMapsDirty } from './enemyAI.js';
@@ -12,12 +12,78 @@ import { startTutorial, stopTutorial, updateTutorial, isClickAllowed } from './t
 let _onStateChange = () => {};
 let _deathType = 'damage'; // 'damage' или 'exhaustion'
 
-function getRowY(y, totalRows) {
+function getRowYForSize(y, totalRows, cellSize) {
   const regularRows = totalRows - 2;
   if (y < regularRows) {
-    return y * DIMS.CELL_SIZE;
+    return y * cellSize;
   }
-  return (regularRows * DIMS.CELL_SIZE) + ((y - regularRows) * DIMS.CELL_SIZE * 2);
+  return (regularRows * cellSize) + ((y - regularRows) * cellSize * 2);
+}
+
+function getRowY(y, totalRows) {
+  return getRowYForSize(y, totalRows, DIMS.CELL_SIZE);
+}
+
+function getCellValue(data, fallback, minimum = 0) {
+  const value = Number(data?.value ?? data?.amount);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(minimum, value);
+}
+
+function getBonusData(data, fallback) {
+  return {
+    ...(data && typeof data === 'object' ? data : {}),
+    value: getCellValue(data, fallback, 1),
+  };
+}
+
+function handOffToBoss() {
+  const { runState } = getGameState();
+  if (!runState || runState.bossTurnScheduled) return;
+  if (runState.player.hp <= 0 || runState.boss.currentHp <= 0) return;
+
+  const runId = runState.runId;
+  runState.bossTurnScheduled = true;
+  scheduleRunCallback(300, () => {
+    const currentState = getGameState();
+    if (!isRunActive(runId)) return;
+    currentState.runState.bossTurnScheduled = false;
+    processBossTurn();
+  });
+}
+
+export function resizeRunVisuals(previousCellSize) {
+  const { runState } = getGameState();
+  if (!runState) return;
+
+  const oldCellSize = Math.max(1, Number(previousCellSize) || 1);
+  const scale = DIMS.CELL_SIZE / oldCellSize;
+  const totalRows = runState.totalRows;
+  const scalePosition = (visual, x, y) => {
+    const baseY = getRowYForSize(y, totalRows, oldCellSize);
+    const currentY = Number.isFinite(visual.y) ? visual.y : baseY;
+    const currentX = Number.isFinite(visual.x) ? visual.x : x * oldCellSize;
+    visual.x = x * DIMS.CELL_SIZE + (currentX - x * oldCellSize) * scale;
+    visual.y = getRowYForSize(y, totalRows, DIMS.CELL_SIZE) + (currentY - baseY) * scale;
+  };
+
+  runState.rows.forEach((row, y) => {
+    row.forEach((cell, x) => {
+      scalePosition(cell.visual, x, y);
+    });
+  });
+
+  scalePosition(runState.player.visual, runState.player.pos.x, runState.player.pos.y);
+  runState.player.visual.h = Math.max(1, (runState.player.visual.h || DIMS.CELL_SIZE) * scale);
+  scalePosition(runState.boss.visual, runState.boss.pos.x, runState.boss.pos.y);
+  runState.scrollY *= scale;
+  runState.targetScrollY *= scale;
+  runState.floatingTexts.forEach((floatingText) => {
+    floatingText.visual.x *= scale;
+    floatingText.visual.y *= scale;
+  });
+  resizeAnimations(scale);
+  runState.visualCellSize = DIMS.CELL_SIZE;
 }
 
 export function initRun(callback) {
@@ -42,8 +108,13 @@ function checkIfPlayerStuck() {
   let hasValidMove = false;
   
   for (let x = 0; x < DIMS.COLS; x++) {
-    const targetCell = rows[targetY][x];
-    if (targetCell.type === OBJECT_TYPES.WALL) continue;
+    const targetCell = rows[targetY]?.[x];
+    if (!targetCell || targetCell.type === OBJECT_TYPES.WALL) continue;
+
+    if (targetCell.type === OBJECT_TYPES.ENEMY && Math.abs(x - player.pos.x) <= 1) {
+      hasValidMove = true;
+      break;
+    }
     
     const moveDistance = Math.abs(x - player.pos.x);
     const energyCost = Math.max(0, moveDistance - 1);
@@ -65,23 +136,34 @@ function checkIfPlayerStuck() {
 }
 
 export function startRun(levelId) {
-  // Останавливаем туториал перед стартом любого уровня
+  clearAnimations();
+  if (typeof document !== 'undefined') {
+    document.getElementById('game-container')?.classList.remove('damage-flash');
+  }
+  _deathType = 'damage';
   stopTutorial();
   
   clearEvents();
   markThreatMapsDirty();
-  emit(Events.RUN_STARTED, { levelId });
 
   const levelData = getLevelById(levelId);
   if (!levelData) {
     console.error(`Level with id "${levelId}" not found!`);
-    return;
+    return false;
+  }
+
+  const validation = validateLevelDefinition(levelData);
+  if (!validation.valid) {
+    console.error(`Level "${levelId}" is invalid: ${validation.errors.join(', ')}`);
+    return false;
   }
 
   const state = getGameState();
   
   const urlParams = new URLSearchParams(window.location.search);
-  const seed = parseInt(urlParams.get('seed'), 10) || Date.now();
+  const seedParam = urlParams.get('seed');
+  const parsedSeed = seedParam === null ? NaN : Number(seedParam);
+  const seed = Number.isSafeInteger(parsedSeed) ? parsedSeed : Date.now();
   const random = createPRNG(seed);
 
   const initialRows = [];
@@ -208,12 +290,16 @@ export function startRun(levelId) {
   const isDebugBoss = levelId === 'debug_boss';
   const startPos = { x: 2, y: 0 };
   state.runState = {
-    seed: seed,
-    levelId: levelId,
+    runId: createRunId(),
+    seed,
+    random,
+    levelId,
     totalRows: levelData.rows,
     rows: initialRows,
-    boss: boss,
+    boss,
     goldCollected: 0,
+    goldCommitted: false,
+    visualCellSize: DIMS.CELL_SIZE,
     player: {
       hp: 20,
       maxHp: 20,
@@ -239,10 +325,12 @@ export function startRun(levelId) {
     floatingTexts: [],
     levelPhase: 'dungeon',
     turnOwner: 'player',
+    bossTurnScheduled: false,
   };
 
   console.log(`Starting run for level: ${levelData.name}`, state.runState);
   emit(Events.RUN_STARTED, { levelId, seed });
+  return true;
 }
 
 export function processPlayerAction(gx, gy) {
@@ -300,21 +388,62 @@ export function processPlayerAction(gx, gy) {
       const distance = Math.abs(gx - player.pos.x);
       if (player.inventory.ammo > 0 && distance <= player.inventory.weapon.range) {
         processPlayerShotOnBoss(targetCell);
+      } else if (distance === 0 && player.inventory.attackBonuses.length > 0) {
+        processBossMeleeAction();
       }
     }
   }
 }
 
+function processBossMeleeAction(onComplete = () => {}) {
+  const { runState } = getGameState();
+  if (!runState) return false;
+  const { player } = runState;
+
+  if (player.inventory.attackBonuses.length === 0) return false;
+
+  runState.turnOwner = 'processing';
+  const originalY = player.visual.y;
+  play({
+    target: player,
+    props: { 'visual.y': originalY + DIMS.CELL_SIZE * 0.5 },
+    duration: 150,
+    onComplete: () => {
+      processPlayerMeleeOnBoss();
+      play({
+        target: player,
+        props: { 'visual.y': originalY },
+        duration: 150,
+        onComplete: () => {
+          onComplete();
+          handOffToBoss();
+        }
+      });
+    }
+  });
+
+  return true;
+}
+
 function processPlayerMove(targetX, targetY) {
   const { runState } = getGameState();
   const { player, rows } = runState;
-  const targetCell = rows[targetY][targetX];
+  const targetCell = rows[targetY]?.[targetX];
 
   console.log(`[PLAYER_MOVE] Moving from (${player.pos.x},${player.pos.y}) to (${targetX},${targetY})`);
   
-  // Проверяем, разрешен ли ход в туториале
+  if (!targetCell) {
+    console.log('[PLAYER_MOVE] Target cell is outside the level');
+    return;
+  }
+
   if (!isClickAllowed(targetX, targetY)) {
     console.log('[PLAYER_MOVE] Move not allowed by tutorial');
+    return;
+  }
+
+  if (targetCell.type === OBJECT_TYPES.WALL) {
+    console.log('[PLAYER_MOVE] Target cell is a wall');
     return;
   }
 
@@ -325,6 +454,7 @@ function processPlayerMove(targetX, targetY) {
     console.log(`Not enough energy. Have: ${player.energy}, Need: ${energyCost}`);
     return;
   }
+
   player.energy -= energyCost;
 
   if (runState.levelPhase === 'dungeon' && targetY >= runState.totalRows - 2) {
@@ -339,10 +469,6 @@ function processPlayerMove(targetX, targetY) {
 
   runState.turnOwner = 'processing';
   console.log('[TURN] turnOwner = processing');
-
-  if (targetCell.type === OBJECT_TYPES.WALL) {
-    return;
-  }
 
   // Сначала обрабатываем атаки врагов из текущего ряда
   const previousY = player.pos.y;
@@ -380,17 +506,17 @@ function processPlayerMove(targetX, targetY) {
         const prevCell = rows[previousY][previousX];
         console.log(`[LEAVE_CELL] (${previousX},${previousY}) type=${prevCell.type}`);
         if (prevCell.type === OBJECT_TYPES.EMPTY) {
-          spawnArenaObject(prevCell, previousX, previousY, runState.totalRows, player.hp / player.maxHp);
+          spawnArenaObject(prevCell, previousX, previousY, runState.totalRows, player.hp / player.maxHp, runState.random);
         }
       }
       
       console.log(`[PLAYER_MOVE] Animation complete, now at (${targetX},${targetY}), interacting with ${targetCell.type}`);
 
-      let turnHandedOverToBoss = false;
+      let bossInteractionPending = false;
 
       switch (targetCell.type) {
         case OBJECT_TYPES.HEAL: {
-          const healAmount = targetCell.data?.amount || CELL_DEFS[OBJECT_TYPES.HEAL].amount;
+          const healAmount = getCellValue(targetCell.data, CELL_DEFS[OBJECT_TYPES.HEAL].amount);
           const oldHp = player.hp;
           player.hp = Math.min(player.maxHp, oldHp + healAmount);
           const actualHealed = player.hp - oldHp;
@@ -400,7 +526,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
           break;
         }
         case OBJECT_TYPES.AMMO: {
@@ -413,7 +539,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
           break;
         }
         case OBJECT_TYPES.ENERGY: {
@@ -426,66 +552,100 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
           break;
         }
         case OBJECT_TYPES.GOLD: {
-          const goldAmount = targetCell.data?.amount || CELL_DEFS[OBJECT_TYPES.GOLD].amount;
+          const goldAmount = getCellValue(targetCell.data, CELL_DEFS[OBJECT_TYPES.GOLD].amount);
           runState.goldCollected += goldAmount;
           createFloatingText(`+${goldAmount} з.`, CELL_DEFS[OBJECT_TYPES.GOLD].color, player.visual);
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
           break;
         }
         case OBJECT_TYPES.ATTACK_BONUS: {
           if (player.inventory.attackBonuses.length < 2) {
-            player.inventory.attackBonuses.push({ ...targetCell.data });
-            createFloatingText(`+${targetCell.data.value} атк.`, CELL_DEFS.attack_bonus.color, player.visual);
-            emit(Events.ITEM_PICKED, { type: 'attack_bonus', value: targetCell.data.value });
+            const bonus = getBonusData(targetCell.data, CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].value);
+            player.inventory.attackBonuses.push(bonus);
+            createFloatingText(`+${bonus.value} атк.`, CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, player.visual);
+            emit(Events.ITEM_PICKED, { type: 'attack_bonus', value: bonus.value });
+            targetCell.type = OBJECT_TYPES.EMPTY;
+            targetCell.data = null;
+            if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
           } else {
             createFloatingText('ПОЛНО', '#6b7280', player.visual);
+            bossInteractionPending = runState.levelPhase === 'boss_arena';
             targetCell.isAnimating = true;
             play({
               target: targetCell,
               props: { 'visual.alpha': 0 },
               duration: 300,
-              onComplete: () => {}
+              onComplete: () => {
+                targetCell.type = OBJECT_TYPES.EMPTY;
+                targetCell.data = null;
+                targetCell.isAnimating = false;
+                if (runState.levelPhase === 'boss_arena') {
+                  spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+                  bossInteractionPending = false;
+                  handOffToBoss();
+                }
+              }
             });
           }
-          targetCell.type = OBJECT_TYPES.EMPTY;
-          targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
           break;
         }
         case OBJECT_TYPES.DEFENSE_BONUS: {
           if (player.inventory.defenseBonuses.length < 2) {
-            player.inventory.defenseBonuses.push({ ...targetCell.data });
-            createFloatingText(`+${targetCell.data.value} защ.`, CELL_DEFS.defense_bonus.color, player.visual);
-            emit(Events.ITEM_PICKED, { type: 'defense_bonus', value: targetCell.data.value });
+            const bonus = getBonusData(targetCell.data, CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].value);
+            player.inventory.defenseBonuses.push(bonus);
+            createFloatingText(`+${bonus.value} защ.`, CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, player.visual);
+            emit(Events.ITEM_PICKED, { type: 'defense_bonus', value: bonus.value });
+            targetCell.type = OBJECT_TYPES.EMPTY;
+            targetCell.data = null;
+            if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
           } else {
             createFloatingText('ПОЛНО', '#6b7280', player.visual);
+            bossInteractionPending = runState.levelPhase === 'boss_arena';
             targetCell.isAnimating = true;
             play({
               target: targetCell,
               props: { 'visual.alpha': 0 },
               duration: 300,
-              onComplete: () => {}
+              onComplete: () => {
+                targetCell.type = OBJECT_TYPES.EMPTY;
+                targetCell.data = null;
+                targetCell.isAnimating = false;
+                if (runState.levelPhase === 'boss_arena') {
+                  spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+                  bossInteractionPending = false;
+                  handOffToBoss();
+                }
+              }
             });
           }
-          targetCell.type = OBJECT_TYPES.EMPTY;
-          targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
           break;
         }
         case OBJECT_TYPES.ATTACK_CELL: {
-          const cellDamage = targetCell.data.value;
-          
-          const actualDamage = calculateAndConsumeAttackBonuses(cellDamage, runState.boss.currentHp, runState.boss.inventory.defenseBonuses);
+          if (runState.levelPhase !== 'boss_arena') {
+            targetCell.type = OBJECT_TYPES.EMPTY;
+            targetCell.data = null;
+            break;
+          }
+
+          const cellDamage = getCellValue(targetCell.data, CELL_DEFS[OBJECT_TYPES.ATTACK_CELL].value);
+          const actualDamage = calculateAndConsumeAttackBonuses(
+            cellDamage,
+            runState.boss.currentHp,
+            runState.boss.inventory.defenseBonuses,
+          );
+          bossInteractionPending = true;
           
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp);
+          if (runState.levelPhase === 'boss_arena') {
+            spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+          }
 
           const originalY = player.visual.y;
           play({
@@ -495,16 +655,16 @@ function processPlayerMove(targetX, targetY) {
             onComplete: () => {
               dealDamageToBoss(actualDamage);
               const bossCell = rows[runState.boss.pos.y][runState.boss.pos.x];
-              createFloatingText(`-${actualDamage}`, '#ef4444', bossCell.visual);
+              if (actualDamage > 0) {
+                createFloatingText(`-${actualDamage}`, '#ef4444', bossCell.visual);
+              }
               play({
                 target: player,
                 props: { 'visual.y': originalY },
                 duration: 150,
                 onComplete: () => {
-                  if (!turnHandedOverToBoss) {
-                    setTimeout(processBossTurn, 300);
-                    turnHandedOverToBoss = true;
-                  }
+                  bossInteractionPending = false;
+                  handOffToBoss();
                 }
               });
             }
@@ -512,8 +672,9 @@ function processPlayerMove(targetX, targetY) {
           break;
         }
         case OBJECT_TYPES.ENEMY: {
+          bossInteractionPending = runState.levelPhase === 'boss_arena';
           // Анимация выпадa игрока к врагу
-          const playerLungeX = player.visual.x + ((gx - player.pos.x) * DIMS.CELL_SIZE * 0.3);
+          const playerLungeX = player.visual.x + ((targetX - player.pos.x) * DIMS.CELL_SIZE * 0.3);
           const playerLungeY = player.visual.y + DIMS.CELL_SIZE * 0.3;
 
           play({
@@ -531,17 +692,22 @@ function processPlayerMove(targetX, targetY) {
               play({
                 target: player,
                 props: {
-                  'visual.x': player.visual.x - ((gx - player.pos.x) * DIMS.CELL_SIZE * 0.3),
+                  'visual.x': player.visual.x - ((targetX - player.pos.x) * DIMS.CELL_SIZE * 0.3),
                   'visual.y': player.visual.y - DIMS.CELL_SIZE * 0.3,
                 },
                 duration: 150,
-                onComplete: () => {
-                  // Сразу после боя обновляем карты угроз, если враг мертв
-                  if (targetCell.data && targetCell.data.currentHp <= 0) {
-                    markThreatMapsDirty();
-                  }
+               onComplete: () => {
+                 if (player.hp <= 0) {
+                   stopTutorial();
+                   setAppState(AppState.RUN_SUMMARY, _onStateChange);
+                   return;
+                 }
 
-                  if (targetCell.data && targetCell.data.currentHp <= 0) {
+                 if (targetCell.data && targetCell.data.currentHp <= 0) {
+                   markThreatMapsDirty();
+                 }
+
+                 if (targetCell.data && targetCell.data.currentHp <= 0) {
                     // Враг побежден — анимация смерти
                     targetCell.isAnimating = true;
                     play({
@@ -556,6 +722,10 @@ function processPlayerMove(targetX, targetY) {
                         targetCell.data = null;
                         if (runState.levelPhase === 'dungeon') {
                           finalizeTurnAfterMove(targetY);
+                        } else {
+                          spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+                          bossInteractionPending = false;
+                          handOffToBoss();
                         }
                       }
                     });
@@ -583,37 +753,20 @@ function processPlayerMove(targetX, targetY) {
         }
       }
 
-      if (runState.levelPhase === 'boss_arena' && !turnHandedOverToBoss) {
+      if (runState.levelPhase === 'boss_arena' && !bossInteractionPending) {
         const canMelee = player.inventory.attackBonuses.length > 0 && runState.boss.pos.x === player.pos.x;
-        console.log(`[BOSS_ARENA] Checking melee: canMelee=${canMelee}, turnHandedOver=${turnHandedOverToBoss}`);
+        console.log(`[BOSS_ARENA] Checking melee: canMelee=${canMelee}`);
         if (canMelee) {
-          const originalY = player.visual.y;
-          play({
-            target: player,
-            props: { 'visual.y': originalY + DIMS.CELL_SIZE * 0.5 },
-            duration: 150,
-            onComplete: () => {
-              processPlayerMeleeOnBoss();
-              play({
-                target: player,
-                props: { 'visual.y': originalY },
-                duration: 150,
-                onComplete: () => {
-                  turnHandedOverToBoss = true;
-                  setTimeout(processBossTurn, 300);
-                }
-              });
-            }
+          bossInteractionPending = true;
+          processBossMeleeAction(() => {
+            bossInteractionPending = false;
           });
         } else {
           console.log('[BOSS_ARENA] No melee, handing turn to boss');
-          setTimeout(processBossTurn, 300);
-          turnHandedOverToBoss = true;
+          handOffToBoss();
         }
       }
       
-      player.hasShotOnCurrentRow = false;
-
       if (runState.levelPhase === 'dungeon') {
         console.log(`[DUNGEON] Processing dungeon phase, targetCell.type=${targetCell.type}`);
         // Для всех типов клеток кроме врага завершаем ход сразу
@@ -635,6 +788,7 @@ function processPlayerShot(targetCell) {
   const { runState } = getGameState();
   const { player } = runState;
 
+  runState.turnOwner = 'processing';
   player.hasShotOnCurrentRow = true;
   player.inventory.ammo--;
 
@@ -677,6 +831,7 @@ function processPlayerShot(targetCell) {
               onComplete: () => {
                 targetCell.type = OBJECT_TYPES.EMPTY;
                 targetCell.data = null;
+                finalizeTurnAfterMove(player.pos.y, false);
                 updateTutorial();
               }
             });
@@ -695,24 +850,28 @@ function processPlayerShotOnBoss(bossCell) {
   const { player, boss } = runState;
 
   console.log(`[SHOT_BOSS] player=(${player.pos.x},${player.pos.y}) boss=(${boss.pos.x},${boss.pos.y})`);
+  runState.turnOwner = 'processing';
   player.inventory.ammo--;
   player.hasShotOnCurrentRow = true;
 
   const weaponDamage = player.inventory.weapon.damage;
   const actualDamage = calculateAndConsumeAttackBonuses(weaponDamage, boss.currentHp, boss.inventory.defenseBonuses);
+  const originalBossX = boss.visual.x;
 
   play({
     target: boss,
-    props: { 'visual.x': boss.visual.x - 6 },
+    props: { 'visual.x': originalBossX - 6 },
     duration: 80,
     onComplete: () => {
       play({
         target: boss,
-        props: { 'visual.x': boss.visual.x + 6 },
+        props: { 'visual.x': originalBossX },
         duration: 80,
         onComplete: () => {
           dealDamageToBoss(actualDamage);
-          createFloatingText(`-${actualDamage}`, '#ef4444', { x: boss.visual.x, y: bossCell.visual.y });
+          if (actualDamage > 0 && bossCell) {
+            createFloatingText(`-${actualDamage}`, '#ef4444', { x: boss.visual.x, y: bossCell.visual.y });
+          }
           if (runState.player.hp > 0 && runState.boss.currentHp > 0) {
             runState.turnOwner = 'player';
           }
@@ -722,7 +881,7 @@ function processPlayerShotOnBoss(bossCell) {
   });
 }
 
-function finalizeTurnAfterMove(targetY) {
+function finalizeTurnAfterMove(targetY, resetShot = true) {
   const { runState } = getGameState();
   const { rows } = runState;
   console.log(`[FINALIZE_TURN] Finalizing turn after move to row ${targetY}`);
@@ -736,6 +895,9 @@ function finalizeTurnAfterMove(targetY) {
   markThreatMapsDirty();
 
   console.log('[TURN] Returning turn to player');
+  if (resetShot) {
+    runState.player.hasShotOnCurrentRow = false;
+  }
   runState.turnOwner = 'player';
   
   // Проверяем, не застрял ли игрок
@@ -745,7 +907,7 @@ function finalizeTurnAfterMove(targetY) {
 function createFloatingText(text, color, position) {
   const { runState } = getGameState();
   const newText = {
-    id: Date.now() + Math.random(),
+    id: `${runState.runId}:${runState.floatingTexts.length}`,
     text,
     color,
     visual: {
@@ -763,26 +925,38 @@ function createFloatingText(text, color, position) {
  */
 function processMeleeAttack(enemyX, enemyY) {
   const { runState } = getGameState();
+  if (!runState) return;
+
   const { player, rows } = runState;
-  const targetCell = rows[enemyY][enemyX];
+  const targetCell = rows[enemyY]?.[enemyX];
+  if (!targetCell || targetCell.type !== OBJECT_TYPES.ENEMY || !targetCell.data) return;
+
+  const moveDistance = Math.abs(enemyX - player.pos.x);
+  const energyCost = Math.max(0, moveDistance - 1);
+  if (player.energy < energyCost) return;
 
   console.log(`[MELEE_ATTACK] Attacking enemy at (${enemyX},${enemyY})`);
+  player.energy -= energyCost;
+
+  const previousX = player.pos.x;
+  const previousY = player.pos.y;
+  const entersArena = enemyY >= runState.totalRows - 2;
+  if (entersArena) {
+    runState.levelPhase = 'boss_arena';
+    runState.targetScrollY = getRowY(runState.totalRows - 2, runState.totalRows);
+    emit(Events.PHASE_CHANGED, { phase: 'boss_arena' });
+  }
 
   runState.turnOwner = 'processing';
 
-  // Сначала атаки врагов "в спину" с текущего ряда
-  const previousY = player.pos.y;
-
-  processEnemyTurns(previousY, { x: player.pos.x, y: previousY }, () => {
+  processEnemyTurns(previousY, { x: previousX, y: previousY }, () => {
     if (player.hp <= 0) {
       _deathType = 'damage';
       setAppState(AppState.RUN_SUMMARY, _onStateChange);
       return;
     }
 
-    // Анимация перемещения игрока к врагу
-    const targetHeight = (enemyY >= runState.totalRows - 2) ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
-
+    const targetHeight = entersArena ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
     play({
       target: player,
       props: {
@@ -792,33 +966,36 @@ function processMeleeAttack(enemyX, enemyY) {
       },
       duration: 250,
       onComplete: () => {
-        // Обновляем позицию игрока
         player.pos.x = enemyX;
         player.pos.y = enemyY;
 
-        // Анимация выпадa (короткий тычок вперёд)
-        const playerLungeY = player.visual.y - DIMS.CELL_SIZE * 0.15;
+        if (entersArena) {
+          const previousCell = rows[previousY]?.[previousX];
+          if (previousCell?.type === OBJECT_TYPES.EMPTY) {
+            spawnArenaObject(previousCell, previousX, previousY, runState.totalRows, player.hp / player.maxHp, runState.random);
+          }
+        }
 
+        const playerLungeY = player.visual.y - DIMS.CELL_SIZE * 0.15;
         play({
           target: player,
-          props: {
-            'visual.y': playerLungeY,
-          },
+          props: { 'visual.y': playerLungeY },
           duration: 100,
           onComplete: () => {
             processMeleeCombat(targetCell);
-
-            // Возвращаем игрока на место
             play({
               target: player,
-              props: {
-                'visual.y': getRowY(enemyY, runState.totalRows),
-              },
+              props: { 'visual.y': getRowY(enemyY, runState.totalRows) },
               duration: 100,
               onComplete: () => {
-                if (targetCell.data && targetCell.data.currentHp <= 0) {
+                if (player.hp <= 0) {
+                  stopTutorial();
+                  setAppState(AppState.RUN_SUMMARY, _onStateChange);
+                  return;
+                }
+
+                if (targetCell.data?.currentHp <= 0) {
                   markThreatMapsDirty();
-                  // Враг побеждён
                   targetCell.isAnimating = true;
                   play({
                     target: targetCell,
@@ -830,12 +1007,16 @@ function processMeleeAttack(enemyX, enemyY) {
                     onComplete: () => {
                       targetCell.type = OBJECT_TYPES.EMPTY;
                       targetCell.data = null;
-                      finalizeTurnAfterMove(enemyY);
+                      if (entersArena) {
+                        spawnArenaObject(targetCell, enemyX, enemyY, runState.totalRows, player.hp / player.maxHp, runState.random);
+                        handOffToBoss();
+                      } else {
+                        finalizeTurnAfterMove(enemyY);
+                      }
                       updateTutorial();
                     }
                   });
                 } else {
-                  // Игрок проиграл бой
                   stopTutorial();
                   setAppState(AppState.RUN_SUMMARY, _onStateChange);
                 }

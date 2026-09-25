@@ -1,24 +1,31 @@
 import { getGameState } from './state.js';
 import { OBJECT_TYPES, CELL_DEFS } from './registry.js';
 import { DIMS } from './config.js';
-import { dealDamageToPlayer } from './combat.js';
+import { calculateAttackOutcome, applyPlayerDamage } from './combat.js';
 import { play } from './animation.js';
 import { createPRNG, generateArenaObject, spawnArenaObject } from './utils.js';
 import { updateTutorial } from './tutorial.js';
 
 export function processBossTurn() {
-  const { runState, runState: { player, boss, rows, seed } } = getGameState();
+  const { runState } = getGameState();
+  if (!runState) return;
+  const { player, boss, rows, seed } = runState;
   
-  // Проверяем, жив ли босс
-  if (!boss || boss.currentHp <= 0) {
-    console.log('[BOSS_TURN] Boss is dead, skipping turn');
+  if (!boss || boss.currentHp <= 0 || player.hp <= 0) {
+    console.log('[BOSS_TURN] Boss or player is unavailable, skipping turn');
     return;
   }
-  
+
+  runState.bossTurnScheduled = false;
+  if (runState.turnOwner !== 'processing' && runState.turnOwner !== 'boss') {
+    return;
+  }
+
+  player.hasShotOnCurrentRow = false;
   runState.turnOwner = 'processing';
   console.log("[BOSS_TURN] Boss is taking a turn, player HP:", player.hp, "boss HP:", boss.currentHp);
 
-  const random = createPRNG(seed + boss.pos.x * boss.pos.y);
+  const random = runState.random || createPRNG(seed + boss.pos.x * boss.pos.y);
 
   const hpPercent = boss.currentHp / boss.hp;
   let aiProfile = 'balanced';
@@ -93,8 +100,9 @@ export function processBossTurn() {
     props: { 'visual.x': targetX * DIMS.CELL_SIZE },
     duration: 200,
     onComplete: () => {
-      const landedCellType = targetCell.type;
-      const landedCellData = targetCell.data;
+       const landedCellType = targetCell.type;
+       const landedCellData = targetCell.data;
+       let bossActionPending = false;
 
       console.log(`[BOSS_MOVE] from x=${oldBossX} to x=${targetX}, landedOn=${landedCellType}`);
       console.log(`[BOSS_CELL] bossCell(${oldBossX}) type=${bossCell.type}`);
@@ -104,59 +112,87 @@ export function processBossTurn() {
 
       // Босс перемещается на новую позицию
       boss.pos.x = targetX;
-      if (boss) boss.lastMoveX = targetX;
-
-      // Очищаем клетку куда пришёл босс — объект использован
-      targetCell.type = OBJECT_TYPES.EMPTY;
-      targetCell.data = null;
+       if (boss) boss.lastMoveX = oldBossX;
 
       // Генерируем объект на старой позиции босса
-      spawnArenaObject(bossCell, oldBossX, boss.pos.y, runState.totalRows, boss.currentHp / boss.hp);
+      spawnArenaObject(bossCell, oldBossX, boss.pos.y, runState.totalRows, boss.currentHp / boss.hp, runState.random);
       console.log(`[BOSS_CELL_AFTER] bossCell(${oldBossX}) type=${bossCell.type}`);
 
       console.log(`[BOSS_PICKUP] landedCellType=${landedCellType}, landedCellData=`, landedCellData, 'boss inv:', boss.inventory);
 
-      if (landedCellType === OBJECT_TYPES.ATTACK_BONUS) {
-        if (boss.inventory.attackBonuses.length < 2) {
-          boss.inventory.attackBonuses.push({ ...landedCellData });
-        } else {
-          targetCell.isAnimating = true;
-          play({
-            target: targetCell,
-            props: { 'visual.alpha': 0 },
-            duration: 300,
-            onComplete: () => {}
-          });
-        }
-      } else if (landedCellType === OBJECT_TYPES.DEFENSE_BONUS) {
-        if (boss.inventory.defenseBonuses.length < 2) {
-          boss.inventory.defenseBonuses.push({ ...landedCellData });
-        } else {
-          targetCell.isAnimating = true;
-          play({
-            target: targetCell,
-            props: { 'visual.alpha': 0 },
-            duration: 300,
-            onComplete: () => {}
-          });
-        }
-      } else if (landedCellType === OBJECT_TYPES.HEAL) {
-        const healAmount = CELL_DEFS[OBJECT_TYPES.HEAL].amount;
-        const oldHp = boss.currentHp;
-        boss.currentHp = Math.min(boss.hp, oldHp + healAmount);
-      } else if (landedCellType === OBJECT_TYPES.ATTACK_CELL) {
-        const cellDamage = landedCellData?.value || CELL_DEFS[OBJECT_TYPES.ATTACK_CELL].value;
-        const bonusDamage = boss.inventory.attackBonuses.reduce((sum, b) => sum + b.value, 0);
-        const totalDamage = cellDamage + bonusDamage;
-        boss.inventory.attackBonuses = [];
-
+       if (landedCellType === OBJECT_TYPES.ATTACK_BONUS) {
+         if (boss.inventory.attackBonuses.length < 2) {
+           boss.inventory.attackBonuses.push({ ...landedCellData });
+           targetCell.type = OBJECT_TYPES.EMPTY;
+           targetCell.data = null;
+         } else {
+           bossActionPending = true;
+           targetCell.isAnimating = true;
+           play({
+             target: targetCell,
+             props: { 'visual.alpha': 0 },
+             duration: 300,
+             onComplete: () => {
+               targetCell.type = OBJECT_TYPES.EMPTY;
+               targetCell.data = null;
+               targetCell.isAnimating = false;
+               bossActionPending = false;
+               if (player.hp > 0) {
+                 runState.turnOwner = 'player';
+                 updateTutorial();
+               }
+             }
+           });
+         }
+       } else if (landedCellType === OBJECT_TYPES.DEFENSE_BONUS) {
+         if (boss.inventory.defenseBonuses.length < 2) {
+           boss.inventory.defenseBonuses.push({ ...landedCellData });
+           targetCell.type = OBJECT_TYPES.EMPTY;
+           targetCell.data = null;
+         } else {
+           bossActionPending = true;
+           targetCell.isAnimating = true;
+           play({
+             target: targetCell,
+             props: { 'visual.alpha': 0 },
+             duration: 300,
+             onComplete: () => {
+               targetCell.type = OBJECT_TYPES.EMPTY;
+               targetCell.data = null;
+               targetCell.isAnimating = false;
+               bossActionPending = false;
+               if (player.hp > 0) {
+                 runState.turnOwner = 'player';
+                 updateTutorial();
+               }
+             }
+           });
+         }
+       } else if (landedCellType === OBJECT_TYPES.HEAL) {
+         const healAmount = CELL_DEFS[OBJECT_TYPES.HEAL].amount;
+         const oldHp = boss.currentHp;
+         boss.currentHp = Math.min(boss.hp, oldHp + healAmount);
+         targetCell.type = OBJECT_TYPES.EMPTY;
+         targetCell.data = null;
+       } else if (landedCellType === OBJECT_TYPES.ATTACK_CELL) {
+         const cellDamage = landedCellData?.value || CELL_DEFS[OBJECT_TYPES.ATTACK_CELL].value;
+         targetCell.type = OBJECT_TYPES.EMPTY;
+         targetCell.data = null;
+         const attackBonuses = boss.inventory.attackBonuses;
+        const defenseBonuses = player.inventory.defenseBonuses;
         const originalY = targetCell.visual.y;
         play({
           target: targetCell,
           props: { 'visual.y': originalY - DIMS.CELL_SIZE * 0.5 },
           duration: 150,
           onComplete: () => {
-            dealDamageToPlayer(totalDamage, boss);
+            const outcome = calculateAttackOutcome(
+              cellDamage,
+              attackBonuses,
+              defenseBonuses,
+              player.hp,
+            );
+            applyPlayerDamage(outcome.hpDamage, boss);
             play({
               target: targetCell,
               props: { 'visual.y': originalY },
@@ -173,10 +209,15 @@ export function processBossTurn() {
             });
           }
         });
-        return;
-      }
+         return;
+       } else {
+         targetCell.type = OBJECT_TYPES.EMPTY;
+         targetCell.data = null;
+       }
 
-      if (player.hp > 0) {
+       if (bossActionPending) return;
+
+       if (player.hp > 0) {
         console.log('[BOSS_TURN] Boss turn complete, returning to player');
         runState.turnOwner = 'player';
         updateTutorial();

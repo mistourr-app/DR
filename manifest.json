@@ -1,7 +1,7 @@
 {
   "name": "Dungeon Card Crawler",
   "short_name": "Dungeon",
-  "description": "Карточная игра-рогалик про спуск в подземелье.",
+  "description": "Пошаговая карточная игра-рогалик про подъём через подземелье.",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#090a0c",
