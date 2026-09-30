@@ -18,5 +18,6 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run graphics:check
+      - run: npm run balance:check
       - run: npm run build:css
       - run: git diff --exit-code -- styles.css

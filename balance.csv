@@ -1,0 +1,117 @@
+﻿# Balance source of truth.
+#
+# This file is the only place balance numbers live. Everything else is derived:
+#   npm run build:balance   regenerates balance.generated.js from this file
+#   npm run balance:check   fails if balance.generated.js is out of date
+#
+# Format: path,value,notes
+#   path is a dotted path that becomes the object shape in balance.generated.js.
+#   A numeric path segment turns its parent into an array.
+#   value is cast to a number when it looks like one, otherwise it stays a string.
+#   Lines starting with # and blank lines are ignored.
+#
+# Nothing outside this file should hardcode a tunable number.
+
+# --- Campaign curve ---------------------------------------------------------
+# Difficulty ramps linearly from Dungeon 1 to the last dungeon.
+campaign.total,30,number of dungeons
+campaign.idPrefix,dungeon_,id prefix, zero padded to two digits
+campaign.rows.from,30,board height on Dungeon 1
+campaign.rows.to,75,board height on the last dungeon
+campaign.bossHpMultiplier.from,1.2,elder hp as a multiple of player hp on Dungeon 1
+campaign.bossHpMultiplier.to,5,elder hp as a multiple of player hp on the last dungeon
+
+# Object spawn chances per cell, they must sum to at most 1.
+campaign.chances.ENEMY.from,0.10,dungeon 1
+campaign.chances.ENEMY.to,0.20,last dungeon
+campaign.chances.WALL.from,0.15,dungeon 1
+campaign.chances.WALL.to,0.30,last dungeon
+campaign.chances.HEAL.from,0.06,dungeon 1
+campaign.chances.HEAL.to,0.05,last dungeon
+campaign.chances.AMMO.from,0.05,dungeon 1
+campaign.chances.AMMO.to,0.04,last dungeon
+campaign.chances.ENERGY.from,0.06,dungeon 1
+campaign.chances.ENERGY.to,0.04,last dungeon
+campaign.chances.ATTACK_BONUS.from,0.05,dungeon 1
+campaign.chances.ATTACK_BONUS.to,0.03,last dungeon
+campaign.chances.DEFENSE_BONUS.from,0.06,dungeon 1
+campaign.chances.DEFENSE_BONUS.to,0.03,last dungeon
+campaign.chances.GOLD.from,0.03,dungeon 1
+campaign.chances.GOLD.to,0.03,last dungeon
+
+# --- Enemy strength window --------------------------------------------------
+# A fixed band of shape.length tiers that slides upwards across the campaign.
+# floor is the offset of the weakest tier against the type base hp.
+# Raising floor.to is the only way to raise the ceiling.
+enemyWindow.floor.from,-1,weakest tier on Dungeon 1, relative to base hp
+enemyWindow.floor.to,6,weakest tier on the last dungeon, relative to base hp
+enemyWindow.shape.0,0.70,share of the weakest tier inside the band
+enemyWindow.shape.1,0.20,share of the middle tier inside the band
+enemyWindow.shape.2,0.10,share of the strongest tier inside the band
+
+# --- Enemy types ------------------------------------------------------------
+# The key stays stable so that tutorial layouts, validation and asset ids keep
+# working; label is what the player sees. Enemy damage equals current hp, so a
+# stronger type also hits harder. type is the spawn weight share, the three must
+# sum to 1.
+enemies.TYPE_1.label,ARCANIST,
+enemies.TYPE_1.hp,4,base hp the strength window is measured against
+enemies.TYPE_1.visionRange,4,cells it can see along its own row
+enemies.TYPE_1.actionRange,4,declared intent, not read at runtime
+enemies.TYPE_1.color,#FF1F1F,
+enemies.TYPE_1.weight,1,relative spawn weight, normalised at load
+enemies.TYPE_2.label,SPEARMAN,
+enemies.TYPE_2.hp,7,base hp the strength window is measured against
+enemies.TYPE_2.visionRange,2,cells it can see along its own row
+enemies.TYPE_2.actionRange,2,declared intent, not read at runtime
+enemies.TYPE_2.color,#FF1F1F,
+enemies.TYPE_2.weight,1,relative spawn weight, normalised at load
+enemies.TYPE_3.label,WARDEN,
+enemies.TYPE_3.hp,10,base hp the strength window is measured against
+enemies.TYPE_3.visionRange,1,sees and strikes only the cells to its sides
+enemies.TYPE_3.actionRange,1,declared intent, not read at runtime
+enemies.TYPE_3.color,#FF1F1F,
+enemies.TYPE_3.weight,1,relative spawn weight, normalised at load
+
+# --- Player -----------------------------------------------------------------
+# Flat for the whole campaign, meta upgrades are not wired up yet.
+# Elder hp is derived from hp times bossHpMultiplier, it has no own field.
+player.hp,20,
+player.energy,10,
+player.weapon.type,crossbow,
+player.weapon.damage,3,damage of one crossbow shot
+player.weapon.range,3,how far a shot reaches in cells
+player.ammo,3,bolts per run
+player.debugAmmo,10,bolts on the hidden debug_boss arena
+
+# --- Cell and item definitions ----------------------------------------------
+# amount is what the game applies, value is the label drawn on the cell.
+# keys match the OBJECT_TYPES members in registry.js
+cells.WALL.label,WALL,
+cells.WALL.color,#3F4556,
+cells.WALL.blocksMovement,true,
+cells.HEAL.label,HEALTH,
+cells.HEAL.value,+6,drawn on the cell
+cells.HEAL.amount,6,hp restored
+cells.HEAL.color,#10B981,
+cells.AMMO.label,BOLTS,
+cells.AMMO.value,+2,drawn on the cell
+cells.AMMO.amount,2,bolts added
+cells.AMMO.color,#5CFAFF,
+cells.ENERGY.label,ENERGY,
+cells.ENERGY.value,+10,drawn on the cell
+cells.ENERGY.amount,10,energy restored
+cells.ENERGY.color,#9E6DFF,
+cells.ATTACK_BONUS.label,ATTACK,
+cells.ATTACK_BONUS.value,5,attack power added to the stack
+cells.ATTACK_BONUS.color,#FF731B,
+cells.DEFENSE_BONUS.label,SHIELD,
+cells.DEFENSE_BONUS.value,5,damage absorbed by the stack
+cells.DEFENSE_BONUS.color,#0084FF,
+cells.ATTACK_CELL.label,ATTACK,
+cells.ATTACK_CELL.value,10,damage of an arena attack cell
+cells.ATTACK_CELL.color,#C40014,
+cells.GOLD.label,GOLD,
+cells.GOLD.value,+5,drawn on the cell
+cells.GOLD.amount,5,gold added
+cells.GOLD.color,#FFE761,

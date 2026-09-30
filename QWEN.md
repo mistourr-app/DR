@@ -60,11 +60,13 @@ BOOT → META_HUB → RUN_PLAYING → RUN_SUMMARY / RUN_VICTORY → META_HUB
 | `tutorial` | 13 | x1 | Фиксированный tutorial |
 | `test_arena` | 6 | x1.5 | Скрытая тестовая арена |
 | `debug_boss` | 3 | x1 | Скрытая арена для боссфайта |
-| `dungeon_01`..`dungeon_30` | 30 → 75 | x1.2 → x5 | Кампания, линейно из `CAMPAIGN_CURVE` |
+| `dungeon_01`..`dungeon_NN` | растут | растут | Кампания, линейно из `CAMPAIGN_CURVE` |
 
 `test_arena` и `debug_boss` скрыты в registry и не появляются в обычном меню. Админка может менять текущий список, порядок и visibility в рамках страницы; в `levelOrder` она пишет только известные id и не включает служебные уровни. Постоянное изменение требует экспорта в `registry.js`.
 
-Каждый уровень кампании дополнительно несёт `enemyStrength` — таблицу `{ hp, weight }` на каждый тип врага. Она собирается из `ENEMY_STRENGTH_WINDOW` в момент генерации: полоса в три тира, пол всплывает от `base − 1` до `base + 6`. Подробности в `PROGRESSION.md`.
+Каждый уровень кампании дополнительно несёт `enemyStrength` — таблицу `{ hp, weight }` на каждый тип врага. Она собирается из `ENEMY_STRENGTH_WINDOW` в момент генерации: полоса фиксированной ширины, пол всплывает от базового HP вниз к `base + floor.to`. Подробности в `PROGRESSION.md`.
+
+Числа кампании, врагов, игрока и предметов лежат только в `balance.csv`; `registry.js` собирает из них `CAMPAIGN_CURVE`, `ENEMY_STRENGTH_WINDOW`, `ENEMY_DEFS`, `CELL_DEFS` и `PLAYER_DEFS`. Правка баланса идёт через `npm run build:balance`, проверка дрейфа — `npm run balance:check`.
 
 Враги описаны в `ENEMY_DEFS` под стабильными ключами `TYPE_N`, игроку показывается `label`: `TYPE_1` ARCANIST (база 4, обзор 4), `TYPE_2` SPEARMAN (база 7, обзор 2), `TYPE_3` WARDEN (база 10, обзор 1). Id спрайтов выводятся из ключа (`TYPE_N` → `type-N`), поэтому переименование врага не ломает графику.
 

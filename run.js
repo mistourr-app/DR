@@ -1,5 +1,5 @@
 import { getGameState, setAppState, createRunId, isRunActive } from './state.js';
-import { getLevelById, validateLevelDefinition, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS, rollEnemyHp } from './registry.js';
+import { getLevelById, validateLevelDefinition, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS, CAMPAIGN_CURVE, PLAYER_DEFS, rollEnemyHp, rollEnemyType } from './registry.js';
 import { DIMS, AppState } from './config.js';
 import { play, clearAnimations, scheduleRunCallback, resizeAnimations } from './animation.js';
 import { Events, emit, clear as clearEvents } from './events.js';
@@ -213,11 +213,9 @@ export function startRun(levelId) {
 
         if (rand < ENEMY) {
           type = OBJECT_TYPES.ENEMY;
-          const enemyKeys = Object.keys(ENEMY_DEFS);
-          // Uniform pick across the enemy types.
-          const enemyType = enemyKeys[Math.floor(random() * enemyKeys.length)];
+          const enemyType = rollEnemyType(random);
           const def = ENEMY_DEFS[enemyType];
-          // Levels built by the campaign generator carry a strength ladder;
+          // Levels built by the campaign generator carry a strength window;
           // static levels fall back to the type's base hp.
           const strengthTable = levelData.enemyStrength?.[enemyType];
           const hp = rollEnemyHp(strengthTable, random) ?? def.hp;
@@ -271,11 +269,15 @@ export function startRun(levelId) {
   }
   }
 
-  const bossHpMultiplier = levelData.bossHpMultiplier || 2.5;
-  const playerBaseHp = 20;
+  // Every level validates bossHpMultiplier, so the fallback only guards against
+  // hand written data. Take it from the campaign curve rather than a stray
+  // literal so there is a single source for balance numbers.
+  const bossHpMultiplier = levelData.bossHpMultiplier
+    ?? (CAMPAIGN_CURVE.bossHpMultiplier.from + CAMPAIGN_CURVE.bossHpMultiplier.to) / 2;
+  // The Elder has no field of its own: its hp is the player's hp scaled up.
   const bossData = {
-    hp: Math.round(playerBaseHp * bossHpMultiplier),
-    currentHp: Math.round(playerBaseHp * bossHpMultiplier),
+    hp: Math.round(PLAYER_DEFS.hp * bossHpMultiplier),
+    currentHp: Math.round(PLAYER_DEFS.hp * bossHpMultiplier),
     label: 'ELDER',
     color: '#FF58F4',
   };
@@ -311,15 +313,15 @@ export function startRun(levelId) {
     goldCommitted: false,
     visualCellSize: DIMS.CELL_SIZE,
     player: {
-      hp: 20,
-      maxHp: 20,
-      energy: 10,
-      maxEnergy: 10,
+      hp: PLAYER_DEFS.hp,
+      maxHp: PLAYER_DEFS.hp,
+      energy: PLAYER_DEFS.energy,
+      maxEnergy: PLAYER_DEFS.energy,
       pos: { ...startPos },
       inventory: {
-        weapon: { type: 'crossbow', range: 3, damage: 3 },
-        ammo: isDebugBoss ? 10 : 3,
-        maxAmmo: isDebugBoss ? 10 : 3,
+        weapon: { ...PLAYER_DEFS.weapon },
+        ammo: isDebugBoss ? PLAYER_DEFS.debugAmmo : PLAYER_DEFS.ammo,
+        maxAmmo: isDebugBoss ? PLAYER_DEFS.debugAmmo : PLAYER_DEFS.ammo,
         attackBonuses: [],
         defenseBonuses: [],
       },

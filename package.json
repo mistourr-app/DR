@@ -7,6 +7,9 @@
     "start": "node server.js",
     "test": "node --test",
     "build:css": "tailwindcss -i ./src/input.css -o ./styles.css --minify",
+    "build:balance": "node scripts/build-balance.mjs",
+    "balance:check": "node scripts/build-balance.mjs --check",
+    "balance:report": "node scripts/build-balance.mjs --print",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "graphics:check": "node scripts/check-graphics.mjs"

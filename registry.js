@@ -1,3 +1,9 @@
+import { BALANCE } from './balance.generated.js';
+
+// Re-exported so that tests and tooling can reach the raw source data without
+// importing the generated module directly.
+export { BALANCE };
+
 // Data version - bump when levels, enemies or balance change
 export const DATA_VERSION = 4;
 
@@ -195,49 +201,54 @@ const STATIC_LEVELS = [
   }
 ];
 
-// Enemy definitions. Declared before CAMPAIGN_LEVELS is built because the
-// strength ladder resolves its tiers against the base hp of each type.
-export const ENEMY_DEFS = {
-  TYPE_1: {
-    label: 'ARCANIST',
-    hp: 4,
-    visionRange: 4, // Sees 4 cells ahead
-    actionRange: 4, // Can attack from 4 cells away
-    color: '#FF1F1F'
-  },
-  TYPE_2: {
-    label: 'SPEARMAN',
-    hp: 7,
-    visionRange: 2, // Sees 2 cells ahead
-    actionRange: 2, // Can attack from 2 cells away
-    color: '#FF1F1F'
-  },
-  TYPE_3: {
-    label: 'WARDEN',
-    hp: 10,
-    visionRange: 1, // Sees only the cells directly to its sides
-    actionRange: 1, // Can attack only the cells directly to its sides
-    color: '#FF1F1F'
+// Enemy definitions, straight out of balance.csv. Declared before
+// CAMPAIGN_LEVELS is built because the strength window resolves its tiers
+// against the base hp of each type.
+//
+// The key stays stable so that tutorial layouts, level validation and sprite
+// ids keep working; `label` is what the player sees. `type` is the spawn share
+// and the shares must sum to 1. Enemy damage equals current hp, so a stronger
+// type also hits harder.
+export const ENEMY_DEFS = BALANCE.enemies;
+
+// Spawn weights are declared as relative numbers in balance.csv and normalised
+// here, so hand editing never has to add up to exactly 1. With the shipped
+// data all three weights are 1, which makes the pick uniform.
+export const ENEMY_TYPE_WEIGHTS = (() => {
+  const total = Object.values(ENEMY_DEFS).reduce((sum, def) => sum + def.weight, 0);
+  return Object.keys(ENEMY_DEFS).map((enemyType, index, keys) => {
+    const normalised = ENEMY_DEFS[enemyType].weight / total;
+    // Last entry absorbs the floating point residue so the shares sum to 1.
+    if (index < keys.length - 1) return { key: enemyType, weight: normalised };
+    const before = keys.slice(0, -1).reduce((sum, key) => sum + ENEMY_DEFS[key].weight / total, 0);
+    return { key: enemyType, weight: 1 - before };
+  });
+})();
+
+// Rolls an enemy type key from ENEMY_TYPE_WEIGHTS.
+export function rollEnemyType(random) {
+  const roll = random();
+  let cumulative = 0;
+
+  for (let index = 0; index < ENEMY_TYPE_WEIGHTS.length; index += 1) {
+    cumulative += ENEMY_TYPE_WEIGHTS[index].weight;
+    if (roll < cumulative) return ENEMY_TYPE_WEIGHTS[index].key;
   }
-};
+
+  return ENEMY_TYPE_WEIGHTS[ENEMY_TYPE_WEIGHTS.length - 1].key;
+}
 
 // Campaign difficulty curve: linear interpolation between the first and last level.
-// from - value on Dungeon 1, to - value on Dungeon 30.
+// from - value on Dungeon 1, to - value on the last dungeon.
+//
+// Every number below comes from balance.csv via balance.generated.js. Nothing
+// here may hardcode a tunable; edit balance.csv and run `npm run build:balance`.
 export const CAMPAIGN_CURVE = {
-  total: 30,
-  idPrefix: 'dungeon_',
-  rows: { from: 30, to: 75 },
-  bossHpMultiplier: { from: 1.2, to: 5 },
-  chances: {
-    ENEMY: { from: 0.1, to: 0.2 },
-    WALL: { from: 0.15, to: 0.3 },
-    HEAL: { from: 0.06, to: 0.05 },
-    AMMO: { from: 0.05, to: 0.04 },
-    ENERGY: { from: 0.06, to: 0.04 },
-    ATTACK_BONUS: { from: 0.05, to: 0.03 },
-    DEFENSE_BONUS: { from: 0.06, to: 0.03 },
-    GOLD: { from: 0.03, to: 0.03 },
-  },
+  total: BALANCE.campaign.total,
+  idPrefix: BALANCE.campaign.idPrefix,
+  rows: BALANCE.campaign.rows,
+  bossHpMultiplier: BALANCE.campaign.bossHpMultiplier,
+  chances: BALANCE.campaign.chances,
 };
 
 function roundChance(value) {
@@ -246,14 +257,14 @@ function roundChance(value) {
 
 // Enemy strength window, shared by every enemy type.
 //
-// A fixed band of three tiers that slides upwards across the campaign.
+// A fixed band of shape.length tiers that slides upwards across the campaign.
 //
 // floor is the offset of the weakest tier against the type's base hp from
 // ENEMY_DEFS, on the first and on the last dungeon. With the shipped numbers a
 // type starts one step below its base and ends six steps above it, so an
 // ARCANIST (base 4) opens on 3-5 and closes on 10-12.
 //
-// shape holds the shares of the three tiers inside the band, weakest first.
+// shape holds the shares of the tiers inside the band, weakest first.
 //
 // The floor travels as a float, so the band hands over gradually: while it
 // sits between two whole offsets the trailing tier fades out at the same time
@@ -261,11 +272,9 @@ function roundChance(value) {
 // of vanishing between two dungeons, and it removes the step the floor used to
 // take on the last level.
 //
-// Raising the ceiling means raising floor.to; there is no other cap.
-export const ENEMY_STRENGTH_WINDOW = {
-  floor: { from: -1, to: 6 },
-  shape: [0.70, 0.20, 0.10],
-};
+// Raising the ceiling means raising floor.to in balance.csv; there is no other
+// cap.
+export const ENEMY_STRENGTH_WINDOW = BALANCE.enemyWindow;
 
 // Resolves the window into concrete hp tiers for one enemy type on one level.
 function buildStrengthTable(window, baseHp, lerp) {
@@ -527,49 +536,21 @@ export const OBJECT_TYPES = {
   GOLD: 'gold',
 };
 
+// Cell and item definitions. The values come from balance.csv, keyed here by the
+// OBJECT_TYPES members so that the rest of the game can keep looking cells up by
+// their runtime type value.
 export const CELL_DEFS = {
-  [OBJECT_TYPES.WALL]: {
-    label: 'WALL',
-    color: '#3F4556',
-    blocksMovement: true
-  },
-  [OBJECT_TYPES.HEAL]: {
-    label: 'HEALTH',
-    value: '+6',
-    amount: 6,
-    color: '#10B981'
-  },
-  [OBJECT_TYPES.AMMO]: {
-    label: 'BOLTS',
-    value: '+2',
-    amount: 2,
-    color: '#5CFAFF'
-  },
-  [OBJECT_TYPES.ENERGY]: {
-    label: 'ENERGY',
-    value: '+10',
-    amount: 10,
-    color: '#9E6DFF'
-  },
-  [OBJECT_TYPES.ATTACK_BONUS]: {
-    label: 'ATTACK',
-    value: 5,
-    color: '#FF731B'
-  },
-  [OBJECT_TYPES.DEFENSE_BONUS]: {
-    label: 'SHIELD',
-    value: 5,
-    color: '#0084FF'
-  },
-  [OBJECT_TYPES.ATTACK_CELL]: {
-    label: 'ATTACK',
-    value: 10, // Default damage of an attack cell
-    color: '#C40014'
-  },
-  [OBJECT_TYPES.GOLD]: {
-    label: 'GOLD',
-    value: '+5',
-    amount: 5,
-    color: '#FFE761'
-  }
+  [OBJECT_TYPES.WALL]: BALANCE.cells.WALL,
+  [OBJECT_TYPES.HEAL]: BALANCE.cells.HEAL,
+  [OBJECT_TYPES.AMMO]: BALANCE.cells.AMMO,
+  [OBJECT_TYPES.ENERGY]: BALANCE.cells.ENERGY,
+  [OBJECT_TYPES.ATTACK_BONUS]: BALANCE.cells.ATTACK_BONUS,
+  [OBJECT_TYPES.DEFENSE_BONUS]: BALANCE.cells.DEFENSE_BONUS,
+  [OBJECT_TYPES.ATTACK_CELL]: BALANCE.cells.ATTACK_CELL,
+  [OBJECT_TYPES.GOLD]: BALANCE.cells.GOLD,
 };
+
+// Player stats, straight out of balance.csv. Flat for the whole campaign because
+// meta upgrades are not wired up yet; the Elder takes player hp times
+// bossHpMultiplier and has no field of its own.
+export const PLAYER_DEFS = BALANCE.player;
