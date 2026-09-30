@@ -188,7 +188,7 @@ export function renderTopBar(runState, onExit) {
     // Slots for the Elder's defense bonuses
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.defenseBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'GUARD', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, true, 'ui.icon.defense') : createSlot('-', 'GUARD', '#6b7280', true, null, null, true, 'ui.slot.boss');
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'SHIELD', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, true, 'ui.icon.defense') : createSlot('-', 'SHIELD', '#6b7280', true, null, null, true, 'ui.slot.boss');
     }
     bossInventoryDisplay.innerHTML = bossInventoryHtml;
     applyAssetBackgrounds(bossInventoryDisplay);
@@ -277,7 +277,7 @@ export function renderUi(runState) {
   // Slots for defense bonuses (always 2)
   for (let i = 0; i < 2; i++) {
     const bonus = inventory.defenseBonuses[i];
-    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'GUARD', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, false, 'ui.icon.defense') : createSlot('-', 'GUARD', '#6b7280', true, null, null, false, 'ui.slot.player');
+    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'SHIELD', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, false, 'ui.icon.defense') : createSlot('-', 'SHIELD', '#6b7280', true, null, null, false, 'ui.slot.player');
   }
 
   // We use innerHTML because it is a simple and fast way to build this UI

@@ -557,7 +557,7 @@ export const CELL_DEFS = {
     color: '#FF731B'
   },
   [OBJECT_TYPES.DEFENSE_BONUS]: {
-    label: 'GUARD',
+    label: 'SHIELD',
     value: 5,
     color: '#0084FF'
   },
