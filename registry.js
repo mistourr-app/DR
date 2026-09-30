@@ -244,43 +244,58 @@ function roundChance(value) {
   return Math.round(value * 10000) / 10000;
 }
 
-// Enemy strength ladder, shared by every enemy type.
+// Enemy strength window, shared by every enemy type.
 //
-// offset is relative to the type's base hp from ENEMY_DEFS, so a tier means
-// "base hp + offset". weight.from is the share of that tier on Dungeon 1,
-// weight.to the share on the last dungeon; the two are interpolated linearly
-// per level. Both ends sum to 1, so the interpolated weights stay normalised.
+// A fixed band of three tiers that slides upwards across the campaign.
 //
-// Early on the low tiers dominate and the strong ones are nearly absent; later
-// the low tiers fade out while new high tiers take over the mass. There is no
-// hard ceiling: append a row to raise the top of the ladder.
-export const ENEMY_STRENGTH_TIERS = [
-  { offset: -1, weight: { from: 0.70, to: 0.00 } },
-  { offset: 0, weight: { from: 0.20, to: 0.00 } },
-  { offset: 1, weight: { from: 0.10, to: 0.05 } },
-  { offset: 2, weight: { from: 0.00, to: 0.35 } },
-  { offset: 3, weight: { from: 0.00, to: 0.25 } },
-  { offset: 4, weight: { from: 0.00, to: 0.20 } },
-  { offset: 5, weight: { from: 0.00, to: 0.10 } },
-  { offset: 6, weight: { from: 0.00, to: 0.05 } },
-];
+// floor is the offset of the weakest tier against the type's base hp from
+// ENEMY_DEFS, on the first and on the last dungeon. With the shipped numbers a
+// type starts one step below its base and ends six steps above it, so an
+// ARCANIST (base 4) opens on 3-5 and closes on 10-12.
+//
+// shape holds the shares of the three tiers inside the band, weakest first.
+//
+// The floor travels as a float, so the band hands over gradually: while it
+// sits between two whole offsets the trailing tier fades out at the same time
+// as the leading tier fades in. That is what makes old strengths wane instead
+// of vanishing between two dungeons, and it removes the step the floor used to
+// take on the last level.
+//
+// Raising the ceiling means raising floor.to; there is no other cap.
+export const ENEMY_STRENGTH_WINDOW = {
+  floor: { from: -1, to: 6 },
+  shape: [0.70, 0.20, 0.10],
+};
 
-// Resolves the ladder into concrete hp tiers for one enemy type on one level.
-// Tiers whose interpolated weight rounds to zero are dropped so that callers
-// only ever see tiers that can actually spawn.
-function buildStrengthTable(tiers, baseHp, lerp) {
-  const entries = [];
+// Resolves the window into concrete hp tiers for one enemy type on one level.
+function buildStrengthTable(window, baseHp, lerp) {
+  const floorPosition = lerp(window.floor);
+  const lowest = Math.floor(floorPosition);
+  const blend = floorPosition - lowest;
+  const [weakest, middle, strongest] = window.shape;
 
-  tiers.forEach((tier) => {
-    const weight = roundChance(lerp(tier.weight));
+  // The band straddles two whole offsets, so blend the two alignments together.
+  // blend 0 means the window sits exactly on `lowest`, blend 1 on `lowest + 1`.
+  const shares = new Map();
+  const add = (offset, weight) => {
     if (weight <= 0) return;
-    entries.push({ hp: baseHp + tier.offset, weight });
-  });
+    shares.set(offset, (shares.get(offset) || 0) + weight);
+  };
 
-  if (entries.length === 0) return [{ hp: baseHp, weight: 1 }];
+  add(lowest, (1 - blend) * weakest);
+  add(lowest + 1, (1 - blend) * middle + blend * weakest);
+  add(lowest + 2, (1 - blend) * strongest + blend * middle);
+  add(lowest + 3, blend * strongest);
 
-  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
-  const table = entries.map(entry => ({ hp: entry.hp, weight: roundChance(entry.weight / total) }));
+  if (shares.size === 0) return [{ hp: baseHp, weight: 1 }];
+
+  const total = [...shares.values()].reduce((sum, weight) => sum + weight, 0);
+  const table = [...shares.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([offset, weight]) => ({ hp: baseHp + offset, weight: roundChance(weight / total) }))
+    // Rounding can collapse a sliver to zero; such a tier can never be rolled,
+    // and leaving it in would let the rollEnemyHp fallback return it.
+    .filter(tier => tier.weight > 0);
 
   // Rounding every share independently can leave the table a few 1e-4 short of 1.
   // Push the residue into the heaviest tier so the shares always sum to exactly 1.
@@ -328,7 +343,7 @@ function buildCampaignLevels(curve) {
     const enemyStrength = {};
     Object.keys(ENEMY_DEFS).forEach((enemyType) => {
       enemyStrength[enemyType] = buildStrengthTable(
-        ENEMY_STRENGTH_TIERS,
+        ENEMY_STRENGTH_WINDOW,
         ENEMY_DEFS[enemyType].hp,
         lerp,
       );
