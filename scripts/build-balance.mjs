@@ -300,6 +300,13 @@ export default BALANCE;
 `;
 }
 
+// Git rewrites line endings on checkout depending on the platform, so a Windows
+// working tree has CRLF where the generator writes LF. Drift checks must compare
+// content, not bytes, or they fail on a clean checkout.
+export function normalizeForCompare(text) {
+  return String(text).replace(/\r\n/g, '\n');
+}
+
 // Builds the strength table for one enemy type on one level of progress.
 // Kept here so `npm run balance:check --print` can show the real curve using
 // the same maths the game uses.
@@ -363,14 +370,14 @@ async function main() {
   const current = await readFile(OUTPUT_PATH, 'utf8').catch(() => null);
 
   if (check) {
-    if (current !== expected) {
+    if (normalizeForCompare(current) !== normalizeForCompare(expected)) {
       console.error(`${path.basename(OUTPUT_PATH)} is out of date with balance.csv.`);
       console.error('Run: npm run build:balance');
       process.exitCode = 1;
       return;
     }
     console.log(`${path.basename(OUTPUT_PATH)} is in sync with balance.csv`);
-  } else if (current !== expected) {
+  } else if (normalizeForCompare(current) !== normalizeForCompare(expected)) {
     await writeFile(OUTPUT_PATH, expected, 'utf8');
     console.log(`wrote ${path.basename(OUTPUT_PATH)} from balance.csv`);
   } else {

@@ -15,7 +15,7 @@ import {
   ENEMY_TYPE_WEIGHTS,
   rollEnemyType,
 } from '../registry.js';
-import { parseBalanceCsv, renderModule, resolveStrengthTable, validateBalance } from '../scripts/build-balance.mjs';
+import { parseBalanceCsv, renderModule, resolveStrengthTable, validateBalance, normalizeForCompare } from '../scripts/build-balance.mjs';
 
 const csv = await readFile(new URL('../balance.csv', import.meta.url), 'utf8');
 const generated = await readFile(new URL('../balance.generated.js', import.meta.url), 'utf8');
@@ -36,10 +36,15 @@ function createUniformRandom(seed = 1) {
 
 test('balance.generated.js is in sync with balance.csv', () => {
   // Guards the "single source of truth" promise: hand editing the generated
-  // module, or forgetting to regenerate after a CSV edit, fails here.
+  // module, or forgetting to regenerate after a CSV edit, fails here. Compared
+  // line ending insensitively, because git rewrites them on checkout.
   const parsed = parseBalanceCsv(csv);
   assert.deepEqual(validateBalance(parsed), [], 'balance.csv no longer validates');
-  assert.equal(renderModule(parsed), generated, 'balance.generated.js is stale, run: npm run build:balance');
+  assert.equal(
+    normalizeForCompare(renderModule(parsed)),
+    normalizeForCompare(generated),
+    'balance.generated.js is stale, run: npm run build:balance',
+  );
 });
 
 test('the generated module is valid javascript and exposes BALANCE', async () => {
