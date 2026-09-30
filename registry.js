@@ -1,5 +1,5 @@
 // Data version - bump when levels, enemies or balance change
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 // Hand-authored levels: the tutorial and the debug arenas.
 // The Dungeon 1..30 campaign is generated from CAMPAIGN_CURVE.
@@ -195,6 +195,32 @@ const STATIC_LEVELS = [
   }
 ];
 
+// Enemy definitions. Declared before CAMPAIGN_LEVELS is built because the
+// strength ladder resolves its tiers against the base hp of each type.
+export const ENEMY_DEFS = {
+  TYPE_1: {
+    label: 'ARCANIST',
+    hp: 4,
+    visionRange: 4, // Sees 4 cells ahead
+    actionRange: 4, // Can attack from 4 cells away
+    color: '#FF1F1F'
+  },
+  TYPE_2: {
+    label: 'SPEARMAN',
+    hp: 7,
+    visionRange: 2, // Sees 2 cells ahead
+    actionRange: 2, // Can attack from 2 cells away
+    color: '#FF1F1F'
+  },
+  TYPE_3: {
+    label: 'WARDEN',
+    hp: 10,
+    visionRange: 1, // Sees only the cells directly to its sides
+    actionRange: 1, // Can attack only the cells directly to its sides
+    color: '#FF1F1F'
+  }
+};
+
 // Campaign difficulty curve: linear interpolation between the first and last level.
 // from - value on Dungeon 1, to - value on Dungeon 30.
 export const CAMPAIGN_CURVE = {
@@ -218,6 +244,73 @@ function roundChance(value) {
   return Math.round(value * 10000) / 10000;
 }
 
+// Enemy strength ladder, shared by every enemy type.
+//
+// offset is relative to the type's base hp from ENEMY_DEFS, so a tier means
+// "base hp + offset". weight.from is the share of that tier on Dungeon 1,
+// weight.to the share on the last dungeon; the two are interpolated linearly
+// per level. Both ends sum to 1, so the interpolated weights stay normalised.
+//
+// Early on the low tiers dominate and the strong ones are nearly absent; later
+// the low tiers fade out while new high tiers take over the mass. There is no
+// hard ceiling: append a row to raise the top of the ladder.
+export const ENEMY_STRENGTH_TIERS = [
+  { offset: -1, weight: { from: 0.70, to: 0.00 } },
+  { offset: 0, weight: { from: 0.20, to: 0.00 } },
+  { offset: 1, weight: { from: 0.10, to: 0.05 } },
+  { offset: 2, weight: { from: 0.00, to: 0.35 } },
+  { offset: 3, weight: { from: 0.00, to: 0.25 } },
+  { offset: 4, weight: { from: 0.00, to: 0.20 } },
+  { offset: 5, weight: { from: 0.00, to: 0.10 } },
+  { offset: 6, weight: { from: 0.00, to: 0.05 } },
+];
+
+// Resolves the ladder into concrete hp tiers for one enemy type on one level.
+// Tiers whose interpolated weight rounds to zero are dropped so that callers
+// only ever see tiers that can actually spawn.
+function buildStrengthTable(tiers, baseHp, lerp) {
+  const entries = [];
+
+  tiers.forEach((tier) => {
+    const weight = roundChance(lerp(tier.weight));
+    if (weight <= 0) return;
+    entries.push({ hp: baseHp + tier.offset, weight });
+  });
+
+  if (entries.length === 0) return [{ hp: baseHp, weight: 1 }];
+
+  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  const table = entries.map(entry => ({ hp: entry.hp, weight: roundChance(entry.weight / total) }));
+
+  // Rounding every share independently can leave the table a few 1e-4 short of 1.
+  // Push the residue into the heaviest tier so the shares always sum to exactly 1.
+  let heaviest = 0;
+  table.forEach((tier, index) => {
+    if (tier.weight > table[heaviest].weight) heaviest = index;
+  });
+  table[heaviest].weight = roundChance(
+    table[heaviest].weight + (1 - table.reduce((sum, tier) => sum + tier.weight, 0)),
+  );
+
+  return table;
+}
+
+// Rolls an hp value from a strength table produced by buildStrengthTable.
+export function rollEnemyHp(strengthTable, random) {
+  if (!Array.isArray(strengthTable) || strengthTable.length === 0) return null;
+
+  const roll = random();
+  let cumulative = 0;
+
+  for (let index = 0; index < strengthTable.length; index += 1) {
+    cumulative += strengthTable[index].weight;
+    if (roll < cumulative) return strengthTable[index].hp;
+  }
+
+  // Guards against floating point drift leaving the last tier unreachable.
+  return strengthTable[strengthTable.length - 1].hp;
+}
+
 function buildCampaignLevels(curve) {
   const lastIndex = curve.total - 1;
   const levels = [];
@@ -232,6 +325,15 @@ function buildCampaignLevels(curve) {
       chances[key] = roundChance(lerp(curve.chances[key]));
     });
 
+    const enemyStrength = {};
+    Object.keys(ENEMY_DEFS).forEach((enemyType) => {
+      enemyStrength[enemyType] = buildStrengthTable(
+        ENEMY_STRENGTH_TIERS,
+        ENEMY_DEFS[enemyType].hp,
+        lerp,
+      );
+    });
+
     const number = index + 1;
     levels.push({
       id: `${curve.idPrefix}${String(number).padStart(2, '0')}`,
@@ -240,6 +342,7 @@ function buildCampaignLevels(curve) {
       difficulty: number,
       bossHpMultiplier: roundChance(lerp(curve.bossHpMultiplier)),
       chances,
+      enemyStrength,
     });
   }
 
@@ -407,23 +510,6 @@ export const OBJECT_TYPES = {
   BOSS: 'boss',
   ATTACK_CELL: 'attack_cell',
   GOLD: 'gold',
-};
-
-export const ENEMY_DEFS = {
-  TYPE_1: {
-    label: 'ARCANIST',
-    hp: 4,
-    visionRange: 4, // Sees 4 cells ahead
-    actionRange: 4, // Can attack from 4 cells away
-    color: '#FF1F1F'
-  },
-  TYPE_2: {
-    label: 'SPEARMAN',
-    hp: 8,
-    visionRange: 2, // Sees 2 cells ahead
-    actionRange: 2, // Can attack from 2 cells away
-    color: '#FF1F1F'
-  }
 };
 
 export const CELL_DEFS = {

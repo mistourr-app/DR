@@ -289,6 +289,46 @@
       "anchor": [0.5, 1],
       "tags": ["actor", "enemy", "type-2", "state"]
     },
+    "enemy.type-3.idle": {
+      "enabled": false,
+      "src": "assets/enemies/type-3/idle.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-3", "state"]
+    },
+    "enemy.type-3.alert": {
+      "enabled": false,
+      "src": "assets/enemies/type-3/alert.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-3", "state"]
+    },
+    "enemy.type-3.attack": {
+      "enabled": false,
+      "src": "assets/enemies/type-3/attack.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-3", "state"]
+    },
+    "enemy.type-3.damaged": {
+      "enabled": false,
+      "src": "assets/enemies/type-3/damaged.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-3", "state"]
+    },
+    "enemy.type-3.death": {
+      "enabled": false,
+      "src": "assets/enemies/type-3/death.png",
+      "mode": "sprite",
+      "sourceSize": [256, 256],
+      "anchor": [0.5, 1],
+      "tags": ["actor", "enemy", "type-3", "state"]
+    },
     "boss.boss-01.idle": {
       "enabled": false,
       "src": "assets/bosses/boss-01/idle.png",

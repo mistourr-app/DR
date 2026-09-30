@@ -1,5 +1,5 @@
 import { getGameState, setAppState, createRunId, isRunActive } from './state.js';
-import { getLevelById, validateLevelDefinition, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS } from './registry.js';
+import { getLevelById, validateLevelDefinition, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS, rollEnemyHp } from './registry.js';
 import { DIMS, AppState } from './config.js';
 import { play, clearAnimations, scheduleRunCallback, resizeAnimations } from './animation.js';
 import { Events, emit, clear as clearEvents } from './events.js';
@@ -214,11 +214,18 @@ export function startRun(levelId) {
         if (rand < ENEMY) {
           type = OBJECT_TYPES.ENEMY;
           const enemyKeys = Object.keys(ENEMY_DEFS);
+          // Uniform pick across the enemy types.
           const enemyType = enemyKeys[Math.floor(random() * enemyKeys.length)];
+          const def = ENEMY_DEFS[enemyType];
+          // Levels built by the campaign generator carry a strength ladder;
+          // static levels fall back to the type's base hp.
+          const strengthTable = levelData.enemyStrength?.[enemyType];
+          const hp = rollEnemyHp(strengthTable, random) ?? def.hp;
           data = { 
-            ...ENEMY_DEFS[enemyType], 
+            ...def, 
             artId: enemyType,
-            currentHp: ENEMY_DEFS[enemyType].hp,
+            hp,
+            currentHp: hp,
           };
         } else if (rand < ENEMY + WALL) {
           type = OBJECT_TYPES.WALL;

@@ -6,7 +6,7 @@ globalThis.window = { location: { search: '' } };
 
 const { getGameState } = await import('../state.js');
 const { DIMS } = await import('../config.js');
-const { OBJECT_TYPES } = await import('../registry.js');
+const { OBJECT_TYPES, ENEMY_DEFS, getLevelById } = await import('../registry.js');
 const { startRun, processPlayerAction, resizeRunVisuals } = await import('../run.js');
 const { processBossTurn } = await import('../bossAI.js');
 const { updateAnimations, isAnimating, clearAnimations } = await import('../animation.js');
@@ -276,4 +276,48 @@ test('resizing rebases queued animation endpoints', () => {
   updateAnimations(125);
   clearAnimations();
   DIMS.CELL_SIZE = previousCellSize;
+});
+
+test('campaign spawns draw enemy strength from the level table', () => {
+  window.location.search = '?seed=20260930';
+
+  ['dungeon_01', 'dungeon_30'].forEach((levelId) => {
+    assert.equal(startRun(levelId), true, levelId);
+    const runState = getGameState().runState;
+    const level = getLevelById(levelId);
+
+    const enemies = runState.rows
+      .flat()
+      .filter(cell => cell.type === OBJECT_TYPES.ENEMY && cell.data);
+
+    assert.equal(enemies.length > 0, true, `${levelId} spawned no enemies`);
+
+    enemies.forEach((cell) => {
+      const { artId, hp, currentHp } = cell.data;
+      const table = level.enemyStrength[artId];
+      const allowed = table.map(tier => tier.hp);
+
+      assert.equal(allowed.includes(hp), true, `${levelId} ${artId} rolled hp ${hp}`);
+      assert.equal(currentHp, hp, `${levelId} ${artId} must start at full hp`);
+      assert.equal(cell.data.visionRange, ENEMY_DEFS[artId].visionRange, `${levelId} ${artId}`);
+    });
+  });
+  clearAnimations();
+  window.location.search = '';
+});
+
+test('static levels keep the base hp of each enemy type', () => {
+  window.location.search = '?seed=20260930';
+  assert.equal(startRun('test_arena'), true);
+  const runState = getGameState().runState;
+
+  runState.rows
+    .flat()
+    .filter(cell => cell.type === OBJECT_TYPES.ENEMY && cell.data)
+    .forEach((cell) => {
+      assert.equal(cell.data.hp, ENEMY_DEFS[cell.data.artId].hp);
+      assert.equal(cell.data.currentHp, ENEMY_DEFS[cell.data.artId].hp);
+    });
+  clearAnimations();
+  window.location.search = '';
 });
