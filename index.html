@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -71,9 +71,9 @@
             display: flex;
             gap: 10px;
             z-index: 20;
-            align-items: flex-end; /* Выравниваем слоты по низу */
-            padding: 0 10px; /* Добавим отступы по бокам */
-            margin-bottom: 10px; /* Небольшой отступ от нижнего края */
+            align-items: flex-end; /* Align the slots to the bottom */
+            padding: 0 10px; /* Side padding */
+            margin-bottom: 10px; /* Small offset from the bottom edge */
         }
         .inventory-group {
             display: flex;
@@ -120,13 +120,13 @@
             cursor: pointer;
             background-color: #1f2937;
             border: 2px solid #4b5563;
-            flex-direction: column; /* Располагаем урон и заряды вертикально */
-            justify-content: center; /* Выравниваем по центру */
-            gap: 2px; /* Небольшой отступ между текстами */
-            padding: 4px 0; /* Вертикальные отступы */
+            flex-direction: column; /* Stack damage and bolts vertically */
+            justify-content: center; /* Center alignment */
+            gap: 2px; /* Small gap between the texts */
+            padding: 4px 0; /* Vertical padding */
         }
         .weapon-slot > div {
-            pointer-events: none; /* Делаем текст "прозрачным" для кликов */
+            pointer-events: none; /* Make the text "transparent" to clicks */
         }
         .progress-box {
             pointer-events: none;
@@ -190,13 +190,13 @@
         }
         #boss-inventory-display {
             position: absolute;
-            top: 100px; /* Отступ от верха */
+            top: 100px; /* Offset from the top */
             left: 50%;
             transform: translateX(-50%);
             display: flex;
             gap: 10px;
             z-index: 20;
-            align-items: flex-start; /* Выравниваем по верху */
+            align-items: flex-start; /* Align to the top */
             padding: 0 10px;
         }
         .ui-button:hover { background-color: #374151; color: white; }
@@ -236,7 +236,7 @@
         }
     </style>
     <style>
-        /* Стили для админки */
+        /* Admin styles */
         #admin-btn { position: absolute; top: 65px; left: 20px; z-index: 35; background-color: rgba(31, 41, 55, 0.7); border: 1px solid #374151; color: #94a3b8; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
         #editor-level-list { display: flex; flex-direction: column-reverse; }
         #admin-btn:hover { background-color: #374151; color: white; }
@@ -275,65 +275,65 @@
     </div>
 
     <div id="victory-screen" class="overlay" style="display: none;">
-        <h2>УРОВЕНЬ ПРОЙДЕН</h2>
-        <p>Вы успешно достигли конца. Отличная работа!</p>
+        <h2>DUNGEON CLEARED</h2>
+        <p>You reached the end. Well fought!</p>
         <div>
-            <button id="victory-to-menu-btn" class="button primary">Меню уровней</button>
+            <button id="victory-to-menu-btn" class="button primary">DUNGEON SELECT</button>
         </div>
     </div>
 
     <div id="game-over-screen" class="overlay death-screen" style="display: none; opacity: 0; transition: opacity 0.5s ease-in;">
         <div class="overlay-content">
-            <h2 id="game-over-title">СИСТЕМА ПОВРЕЖДЕНА</h2>
-            <p id="game-over-message">Ваше здоровье упало до нуля</p>
+            <h2 id="game-over-title">YOUR LIGHT FADES</h2>
+            <p id="game-over-message">Your vitality drained to nothing</p>
         </div>
         <div class="overlay-buttons flex flex-col gap-2 w-full max-w-sm">
-            <button id="restart-level-btn" class="button primary w-full">Попробовать снова</button>
-            <button id="game-over-to-menu-btn" class="button w-full">Меню уровней</button>
+            <button id="restart-level-btn" class="button primary w-full">TRY AGAIN</button>
+            <button id="game-over-to-menu-btn" class="button w-full">DUNGEON SELECT</button>
         </div>
     </div>
 
     <div id="level-editor-screen" class="overlay" style="display: none;">
-        <h2>РЕДАКТОР УРОВНЕЙ</h2>
+        <h2>LEVEL EDITOR</h2>
         <div id="editor-level-list" class="w-full max-w-md my-4"></div>
         <div>
-            <button id="create-new-level-btn" class="button primary">Создать уровень</button>
-            <button class="button" onclick="window.location.href='index.html'">Назад</button>
+            <button id="create-new-level-btn" class="button primary">CREATE DUNGEON</button>
+            <button class="button" onclick="window.location.href='index.html'">BACK</button>
         </div>
     </div>
 
     <div id="create-level-screen" class="overlay" style="display: none;">
-        <h2 id="create-level-title">СОЗДАНИЕ УРОВНЯ</h2>
+        <h2 id="create-level-title">CREATE DUNGEON</h2>
         <div class="form-grid">
             <div class="full-width">
-                <label for="level-name">Название уровня</label>
+                <label for="level-name">Dungeon name</label>
                 <input type="text" id="level-name">
             </div>
             <div>
-                <label for="level-rows">Длина (ряды)</label>
+                <label for="level-rows">Length (rows)</label>
                 <input type="number" id="level-rows" min="3" max="100">
             </div>
             <div>
-                <label for="level-boss-hp">Множитель HP босса (от HP игрока)</label>
+                <label for="level-boss-hp">Elder HP multiplier (of player HP)</label>
                 <input type="number" id="level-boss-hp" min="0.1" step="0.1">
             </div>
-            <h3 class="full-width text-lg font-bold mt-4">Шансы появления объектов (%)</h3>
-            <!-- Поля для шансов будут добавлены динамически -->
+            <h3 class="full-width text-lg font-bold mt-4">Object spawn chances (%)</h3>
+            <!-- The chance fields are injected dynamically -->
         </div>
         <div>
-            <button id="save-level-btn" class="button primary">Сохранить</button>
-            <button id="cancel-create-level-btn" class="button">Отмена</button>
+            <button id="save-level-btn" class="button primary">SAVE</button>
+            <button id="cancel-create-level-btn" class="button">CANCEL</button>
         </div>
     </div>
 
     <script type="module" src="main.js?v=26"></script>
     <script type="module">
-      // Устанавливаем цвет золота из registry.js
+      // Take the gold colour from registry.js
       import { CELL_DEFS, OBJECT_TYPES } from './registry.js';
       document.documentElement.style.setProperty('--gold-color', CELL_DEFS[OBJECT_TYPES.GOLD].color);
     </script>
     <script>
-      // Скрытый вход в админку: 5 кликов по заголовку
+      // Hidden entry into the admin: 5 clicks on the heading
       let clickCount = 0;
       let clickTimer = null;
       
@@ -343,13 +343,13 @@
           title.addEventListener('click', () => {
             clickCount++;
             
-            // Сбрасываем счетчик через 1 секунду
+            // Reset the counter after 1 second
             clearTimeout(clickTimer);
             clickTimer = setTimeout(() => {
               clickCount = 0;
             }, 1000);
             
-            // При 5 кликах открываем админку
+            // Open the admin on 5 clicks
             if (clickCount === 5) {
               window.location.href = 'admin.html';
             }

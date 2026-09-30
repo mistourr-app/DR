@@ -1,7 +1,7 @@
 {
   "name": "Dungeon Card Crawler",
   "short_name": "Dungeon",
-  "description": "Пошаговая карточная игра-рогалик про подъём через подземелье.",
+  "description": "A turn-based card roguelike about descending into the dungeon.",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#090a0c",

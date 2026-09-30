@@ -53,7 +53,7 @@ test('boss hp grows linearly from 1.2 to 5', () => {
     if (!previous) return;
     assert.equal(level.bossHpMultiplier >= previous.bossHpMultiplier, true, level.id);
   });
-  // HP считается как round(20 * multiplier), поэтому финальный босс заметно живучее первого.
+  // HP is computed as round(20 * multiplier), so the final Elder is much sturdier than the first.
   assert.equal(Math.round(20 * FIRST.bossHpMultiplier), 24);
   assert.equal(Math.round(20 * LAST.bossHpMultiplier), 100);
 });
@@ -120,7 +120,7 @@ test('retired level ids are gone from the registry', () => {
     assert.equal(/^sector_/.test(id), false, id);
     assert.equal(id === 'core', false, id);
   });
-  // Учебный и отладочные уровни остаются в реестре.
+  // The tutorial and the debug dungeons stay in the registry.
   assert.equal(getLevelById('tutorial').isTutorial, true);
   assert.equal(getLevelById('debug_boss').hidden, true);
   assert.equal(getLevelById('test_arena').hidden, true);
@@ -130,6 +130,6 @@ test('campaign levels are listed in ascending order after the static levels', ()
   const campaignIds = LEVELS.filter(level => /^dungeon_\d+$/.test(level.id)).map(level => level.id);
   assert.deepEqual(campaignIds, CAMPAIGN_LEVELS.map(level => level.id));
   assert.equal(LEVELS.length, TOTAL + 3);
-  // Ни один уровень кампании не скрыт: все 30 доступны сразу.
+  // No campaign dungeon is hidden: all 30 are available right away.
   assert.equal(CAMPAIGN_LEVELS.filter(level => level.hidden).length, 0);
 });

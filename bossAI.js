@@ -75,7 +75,7 @@ export function processBossTurn() {
     }
   }
 
-  // Разрыв циклов: избегаем возврата на предыдущую позицию
+    // Break the loop: avoid moving back to the previous position
   if (bestMoves.length > 1 && boss.lastMoveX != null) {
     const filtered = bestMoves.filter(m => m !== boss.lastMoveX);
     if (filtered.length > 0) bestMoves = filtered;
@@ -107,14 +107,14 @@ export function processBossTurn() {
       console.log(`[BOSS_MOVE] from x=${oldBossX} to x=${targetX}, landedOn=${landedCellType}`);
       console.log(`[BOSS_CELL] bossCell(${oldBossX}) type=${bossCell.type}`);
 
-      // Сбрасываем visual старой клетки на своё место
+      // Reset the old cell's visual back to its own position
       bossCell.visual.x = oldBossX * DIMS.CELL_SIZE;
 
-      // Босс перемещается на новую позицию
+      // The Elder moves to the new position
       boss.pos.x = targetX;
        if (boss) boss.lastMoveX = oldBossX;
 
-      // Генерируем объект на старой позиции босса
+      // Spawn an object on the Elder's old position
       spawnArenaObject(bossCell, oldBossX, boss.pos.y, runState.totalRows, boss.currentHp / boss.hp, runState.random);
       console.log(`[BOSS_CELL_AFTER] bossCell(${oldBossX}) type=${bossCell.type}`);
 

@@ -43,8 +43,8 @@ function resize() {
 }
 
 /**
- * Функция, которая вызывается при смене состояния приложения.
- * Отвечает за настройку UI для нового состояния.
+ * Called whenever the application state changes.
+ * Responsible for setting up the UI for the new state.
  */
 function onStateChange(newState, oldState) {
   hideAllScreens();
@@ -64,7 +64,7 @@ function onStateChange(newState, oldState) {
       const lastRunLevelId = state.runState?.levelId;
       const goldCollected = state.runState?.goldCollected || 0;
 
-      // Сохраняем золото при смерти
+      // Persist gold on death
       if (goldCollected > 0) {
         addGold(goldCollected);
       }
@@ -94,7 +94,7 @@ function onStateChange(newState, oldState) {
       const state = getGameState();
       const goldCollected = state.runState?.goldCollected || 0;
 
-      // Сохраняем золото при победе
+      // Persist gold on victory
       if (goldCollected > 0) {
         addGold(goldCollected);
       }
@@ -121,8 +121,8 @@ function update(deltaTime) {
 
   switch (state.appState) {
     case AppState.RUN_PLAYING:
-      // Логика самого забега (движение, бой)
-      // Здесь мы скоро будем вызывать updateRun()
+  // Run logic itself (movement, combat)
+  // updateRun() will be called from here soon
       break;
   }
 }
@@ -130,12 +130,12 @@ function update(deltaTime) {
 function render(deltaTime = 1000 / 60) {
   const state = getGameState();
   
-  // Обновляем счётчик золота на каждом кадре
+  // Refresh the gold counter on every frame
   updateGoldCounter();
   
-  // Не рендерим canvas в меню для экономии ресурсов
+  // Do not render the canvas in the menu to save resources
   if (state.appState === AppState.META_HUB) {
-    // Заливаем чёрным цветом
+    // Fill with black
     ctx.fillStyle = '#090a0c';
     ctx.fillRect(0, 0, DIMS.CANVAS_WIDTH, DIMS.CANVAS_HEIGHT);
     return;
@@ -147,7 +147,7 @@ function render(deltaTime = 1000 / 60) {
     case AppState.RUN_PLAYING:
       renderTopBar(state.runState, () => {
         clearAnimations();
-        // Останавливаем туториал при выходе в меню
+        // Stop the tutorial when returning to the menu
         stopTutorial();
         const url = new URL(window.location);
         url.searchParams.delete('seed');
@@ -203,14 +203,14 @@ function gameLoop(time = 0) {
   requestAnimationFrame(gameLoop);
 }
 
-// Запуск игры
+  // Boot the game
 document.body.style.margin = '0';
 resize();
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
 canvas.addEventListener('click', handleCanvasClick);
 initRenderer(ctx);
-initRun(onStateChange); // Передаём callback в run.js для вызова showGameOverScreen/showVictoryScreen
+  initRun(onStateChange); // Hand the callback to run.js so it can call showGameOverScreen/showVictoryScreen
 
 loadMetaState();
 loadAssets({ onError: (error) => console.warn('Graphics assets unavailable; using procedural fallback', error) });

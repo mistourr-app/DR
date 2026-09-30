@@ -5,82 +5,82 @@ let tutorialActive = false;
 
 export const TUTORIAL_STEPS = [
   {
-    text: "Тапни на клетку впереди чтобы двигаться",
-    allowedCells: [{x: 2, y: 1}], // Ряд 2 (индекс 1)
+    text: "Tap the cell ahead to move",
+    allowedCells: [{x: 2, y: 1}], // Row 2 (index 1)
     checkComplete: (state) => state.runState.player.pos.y >= 1
   },
   {
-    text: "Тапни на клетку по диагонали (прыжок стоит 1 энергию)",
-    allowedCells: [{x: 0, y: 2}, {x: 4, y: 2}], // Ряд 3 (индекс 2)
+    text: "Tap a diagonal cell (a leap costs 1 energy)",
+    allowedCells: [{x: 0, y: 2}, {x: 4, y: 2}], // Row 3 (index 2)
     checkComplete: (state) => state.runState.player.pos.y >= 2 && state.runState.player.energy < 10
   },
   {
-    text: "Подбери здоровье",
-    allowedCells: [{x: 2, y: 3}], // Ряд 4 (индекс 3)
+    text: "Pick up the health",
+    allowedCells: [{x: 2, y: 3}], // Row 4 (index 3)
     checkComplete: (state) => state.runState.player.pos.y >= 3
   },
   {
-    text: "Подбери патроны для арбалета",
-    allowedCells: [{x: 2, y: 4}], // Ряд 5 (индекс 4)
+    text: "Take crossbow bolts",
+    allowedCells: [{x: 2, y: 4}], // Row 5 (index 4)
     checkComplete: (state) => state.runState.player.pos.y >= 4
   },
   {
-    text: "Атакуй врага в ближнем бою",
-    allowedCells: [{x: 2, y: 5}], // Ряд 6 (индекс 5)
+    text: "Strike an enemy in melee",
+    allowedCells: [{x: 2, y: 5}], // Row 6 (index 5)
     checkComplete: (state) => state.runState.player.pos.y >= 5
   },
   {
-    text: "Двигайся вперед",
-    allowedCells: [{x: 2, y: 6}], // Ряд 7 (индекс 6)
+    text: "Push forward",
+    allowedCells: [{x: 2, y: 6}], // Row 7 (index 6)
     checkComplete: (state) => state.runState.player.pos.y >= 6
   },
   {
-    text: "Двигайся вперед на ряд с врагом",
-    allowedCells: [{x: 2, y: 7}], // Ряд 8 (индекс 7)
+    text: "Advance into the row with the enemy",
+    allowedCells: [{x: 2, y: 7}], // Row 8 (index 7)
     checkComplete: (state) => state.runState.player.pos.y >= 7
   },
   {
-    text: "Выстрели из арбалета во врага слева",
-    allowedCells: [{x: 0, y: 7}], // Ряд 8 (индекс 7) - враг слева
+    text: "Shoot the enemy on your left",
+    allowedCells: [{x: 0, y: 7}], // Row 8 (index 7) - enemy on the left
     checkComplete: (state) => state.runState.player.inventory.ammo < 3
   },
   {
-    text: "Иди вперед. Враг сзади атакует в спину!",
-    allowedCells: [{x: 2, y: 8}], // Ряд 9 (индекс 8)
+    text: "Move on. That enemy strikes from behind!",
+    allowedCells: [{x: 2, y: 8}], // Row 9 (index 8)
     checkComplete: (state) => state.runState.player.pos.y >= 8
   },
   {
-    text: "Подбери бонус атаки",
-    allowedCells: [{x: 2, y: 9}], // Ряд 10 (индекс 9)
+    text: "Take the attack charm",
+    allowedCells: [{x: 2, y: 9}], // Row 10 (index 9)
     checkComplete: (state) => state.runState.player.inventory.attackBonuses.length > 0
   },
   {
-    text: "Атакуй врага с бонусом атаки",
-    allowedCells: [{x: 2, y: 10}], // Ряд 11 (индекс 10)
+    text: "Strike the charmed enemy",
+    allowedCells: [{x: 2, y: 10}], // Row 11 (index 10)
     checkComplete: (state) => state.runState.player.pos.y >= 10
   },
   {
-    text: "Двигайся вперед в арену босса",
-    allowedCells: [{x: 2, y: 11}], // Ряд 12 (индекс 11) - первый ряд арены
+    text: "Descend into the Elder hall",
+    allowedCells: [{x: 2, y: 11}], // Row 12 (index 11) - first arena row
     checkComplete: (state) => state.runState.player.pos.y >= 11
   },
   {
-    text: "Атакуй Босса!",
-    allowedCells: [{x: 1, y: 11}], // Соседняя клетка атаки слева
+    text: "Strike the Elder!",
+    allowedCells: [{x: 1, y: 11}], // Neighbouring attack cell on the left
     checkComplete: (state) => {
       const player = state.runState.player;
       const boss = state.runState.boss;
-      // Проверяем, что игрок на клетке (1, 11) И босс получил урон
+      // Check that the player stands on (1, 11) AND the Elder took damage
       return player.pos.x === 1 && player.pos.y === 11 && boss.currentHp < boss.hp;
     }
   },
   {
-    text: "Finish Him!",
-    allowedCells: [{x: 3, y: 11}], // Клетка атаки справа (прыжок через центр)
+    text: "End it.",
+    allowedCells: [{x: 3, y: 11}], // Attack cell on the right (leap over the centre)
     checkComplete: (state) => {
       const player = state.runState.player;
       const boss = state.runState.boss;
-      // Проверяем, что игрок на клетке (3, 11) И босс мертв
+      // Check that the player stands on (3, 11) AND the Elder is dead
       return player.pos.x === 3 && player.pos.y === 11 && boss.currentHp <= 0;
     }
   }
@@ -140,9 +140,9 @@ export function isClickAllowed(x, y) {
   const playerPos = state.runState?.player?.pos;
   console.log('[TUTORIAL] Player at:', playerPos, 'clicking:', x, y, 'step:', currentStep);
   
-  // Для шагов с динамическими клетками (attack_cell в боссфайте)
+  // For steps with dynamic cells (attack_cell during the Elder fight)
   if (!step.allowedCells) {
-    // Все шаги теперь используют allowedCells, этот блок не должен выполняться
+    // Every step now uses allowedCells, so this block must never run
     return true;
   }
   

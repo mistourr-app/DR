@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Админка - Управление уровнями</title>
+  <title>Admin - Dungeon Management</title>
   <link rel="stylesheet" href="styles.css">
   <style>
     .dragging { opacity: 0.5; }
@@ -13,50 +13,50 @@
 <body class="bg-gray-900 text-gray-100">
   <div class="container mx-auto p-4 max-w-6xl">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">🎮 Админка уровней</h1>
-      <a href="index.html" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">← Вернуться к игре</a>
+      <h1 class="text-3xl font-bold">🎮 Dungeon Admin</h1>
+      <a href="index.html" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">← Back to the game</a>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="bg-gray-800 rounded-lg p-6">
-        <h2 class="text-xl font-bold mb-4">📋 Существующие уровни (снизу вверх)</h2>
+        <h2 class="text-xl font-bold mb-4">📋 Existing dungeons (bottom to top)</h2>
         <div id="levels-list" class="space-y-2"></div>
         <button id="add-level-btn" class="mt-4 w-full px-4 py-2 bg-green-600 hover:bg-green-700 rounded">
-          ➕ Создать новый уровень
+          ➕ Create a new dungeon
         </button>
       </div>
 
       <div class="bg-gray-800 rounded-lg p-6">
-        <h2 class="text-xl font-bold mb-4">✏️ Редактор уровня</h2>
+        <h2 class="text-xl font-bold mb-4">✏️ Dungeon Editor</h2>
         <div id="editor-content">
-          <p class="text-gray-400">Выберите уровень для редактирования</p>
+          <p class="text-gray-400">Pick a dungeon to edit</p>
         </div>
       </div>
     </div>
 
     <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 class="text-xl font-bold mb-4">Создать новый уровень</h3>
+        <h3 class="text-xl font-bold mb-4">Create a new dungeon</h3>
         <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium mb-1">ID уровня</label>
+            <label class="block text-sm font-medium mb-1">Dungeon ID</label>
             <input id="new-level-id" type="text" class="w-full px-3 py-2 bg-gray-700 rounded" placeholder="dungeon_31">
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">Название</label>
+            <label class="block text-sm font-medium mb-1">Name</label>
             <input id="new-level-name" type="text" class="w-full px-3 py-2 bg-gray-700 rounded" placeholder="Dungeon 31">
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">Количество рядов</label>
+            <label class="block text-sm font-medium mb-1">Row count</label>
             <input id="new-level-rows" type="number" class="w-full px-3 py-2 bg-gray-700 rounded" value="30" min="3" max="100">
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">Множитель HP босса</label>
+            <label class="block text-sm font-medium mb-1">Elder HP multiplier</label>
             <input id="new-level-boss-hp" type="number" step="0.1" class="w-full px-3 py-2 bg-gray-700 rounded" value="2.5" min="0.1" max="100">
           </div>
           <div class="flex gap-2">
-            <button id="create-level-btn" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded">Создать</button>
-            <button id="cancel-create-btn" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded">Отмена</button>
+            <button id="create-level-btn" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded">CREATE</button>
+            <button id="cancel-create-btn" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded">CANCEL</button>
           </div>
         </div>
       </div>
@@ -112,7 +112,7 @@
       }
     }
 
-    // Служебные уровни не участвуют в порядке выбора, чтобы не засорять localStorage.
+    // Utility dungeons stay out of the pick order so they do not clutter localStorage.
     const INTERNAL_LEVEL_IDS = new Set(['test_arena', 'debug_boss']);
 
     function saveLevelOrder() {
@@ -143,8 +143,8 @@
           <div class="flex items-center gap-2">
             <span class="text-2xl">${level.isTutorial ? '🔒' : '☰'}</span>
             <div>
-              <div class="font-bold ${level.hidden ? 'text-gray-400 line-through' : ''}">${escapeHtml(level.name)}${level.isTutorial ? ' (защищен)' : ''}</div>
-               <div class="text-sm text-gray-400">${escapeHtml(level.rows)} рядов • Boss HP x${escapeHtml(level.bossHpMultiplier)} ${level.hidden ? '• Скрыт' : ''}</div>
+              <div class="font-bold ${level.hidden ? 'text-gray-400 line-through' : ''}">${escapeHtml(level.name)}${level.isTutorial ? ' (protected)' : ''}</div>
+               <div class="text-sm text-gray-400">${escapeHtml(level.rows)} rows • Elder HP x${escapeHtml(level.bossHpMultiplier)} ${level.hidden ? '• Hidden' : ''}</div>
             </div>
           </div>
           <div class="flex gap-2">
@@ -178,7 +178,7 @@
           e.stopPropagation();
           const index = parseInt(btn.dataset.index);
           if (currentLevels[index].isTutorial) {
-            alert('🔒 Туториал нельзя скрыть');
+            alert('🔒 The tutorial cannot be hidden');
             return;
           }
           toggleVisibility(index);
@@ -190,7 +190,7 @@
           e.stopPropagation();
           const index = parseInt(btn.dataset.index);
           if (currentLevels[index].isTutorial) {
-            alert('🔒 Туториал защищен от редактирования');
+            alert('🔒 The tutorial is protected from editing');
             return;
           }
           editLevel(index);
@@ -202,7 +202,7 @@
           e.stopPropagation();
           const index = parseInt(btn.dataset.index);
           if (currentLevels[index].isTutorial) {
-            alert('🔒 Туториал защищен от удаления');
+            alert('🔒 The tutorial is protected from deletion');
             return;
           }
           deleteLevel(index);
@@ -258,66 +258,66 @@
              <input id="edit-id" type="text" value="${escapeHtml(selectedLevel.id)}" class="w-full px-3 py-2 bg-gray-700 rounded" readonly>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">Название</label>
+            <label class="block text-sm font-medium mb-1">Name</label>
              <input id="edit-name" type="text" value="${escapeHtml(selectedLevel.name)}" class="w-full px-3 py-2 bg-gray-700 rounded">
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">Количество рядов</label>
+            <label class="block text-sm font-medium mb-1">Row count</label>
              <input id="edit-rows" type="number" value="${escapeHtml(selectedLevel.rows)}" class="w-full px-3 py-2 bg-gray-700 rounded" min="3" max="100">
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1">Множитель HP босса</label>
+            <label class="block text-sm font-medium mb-1">Elder HP multiplier</label>
              <input id="edit-boss-hp" type="number" step="0.1" value="${escapeHtml(selectedLevel.bossHpMultiplier)}" class="w-full px-3 py-2 bg-gray-700 rounded" min="0.1" max="100">
           </div>
           
           <div class="border-t border-gray-700 pt-4">
-            <h3 class="font-bold mb-2">Шансы спавна объектов</h3>
+            <h3 class="font-bold mb-2">Object spawn chances</h3>
             ${selectedLevel.chances ? `
               <div class="mb-3 p-2 bg-gray-900 rounded">
-                <div class="text-sm font-bold text-green-400">Пустые клетки: <span id="empty-percent">0</span>%</div>
+                <div class="text-sm font-bold text-green-400">Empty cells: <span id="empty-percent">0</span>%</div>
               </div>
               <div class="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <label class="block text-xs text-gray-400">Враги (%)</label>
+                  <label class="block text-xs text-gray-400">Enemies (%)</label>
                   <input id="edit-enemy" type="number" step="1" value="${selectedLevel.chances.ENEMY * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Стены (%)</label>
+                  <label class="block text-xs text-gray-400">Walls (%)</label>
                   <input id="edit-wall" type="number" step="1" value="${selectedLevel.chances.WALL * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Здоровье (%)</label>
+                  <label class="block text-xs text-gray-400">Health (%)</label>
                   <input id="edit-heal" type="number" step="1" value="${selectedLevel.chances.HEAL * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Патроны (%)</label>
+                  <label class="block text-xs text-gray-400">Bolts (%)</label>
                   <input id="edit-ammo" type="number" step="1" value="${selectedLevel.chances.AMMO * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Энергия (%)</label>
+                  <label class="block text-xs text-gray-400">Energy (%)</label>
                   <input id="edit-energy" type="number" step="1" value="${selectedLevel.chances.ENERGY * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Бонус атаки (%)</label>
+                  <label class="block text-xs text-gray-400">Attack bonus (%)</label>
                   <input id="edit-attack-bonus" type="number" step="1" value="${selectedLevel.chances.ATTACK_BONUS * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Бонус защиты (%)</label>
+                  <label class="block text-xs text-gray-400">Defense bonus (%)</label>
                   <input id="edit-defense-bonus" type="number" step="1" value="${selectedLevel.chances.DEFENSE_BONUS * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
                 <div>
-                  <label class="block text-xs text-gray-400">Золото (%)</label>
+                  <label class="block text-xs text-gray-400">Gold (%)</label>
                   <input id="edit-gold" type="number" step="1" value="${(selectedLevel.chances.GOLD || 0) * 100}" class="chance-input w-full px-2 py-1 bg-gray-700 rounded" min="0" max="100">
                 </div>
               </div>
-            ` : '<p class="text-gray-400 text-sm">Это туториал с фиксированным layout</p>'}
+            ` : '<p class="text-gray-400 text-sm">This is a tutorial with a fixed layout</p>'}
           </div>
 
           <div class="flex gap-2 pt-4">
-            <button id="save-btn" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded">💾 Сохранить</button>
-            <button id="export-btn" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">📥 Экспорт</button>
+            <button id="save-btn" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded">💾 SAVE</button>
+            <button id="export-btn" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">📥 EXPORT</button>
           </div>
-          <p class="text-gray-400 text-xs pt-2">Экспорт выдаёт статический массив LEVELS и затрёт генератор кампании. Для Dungeon 1..30 меняйте CAMPAIGN_CURVE в registry.js.</p>
+          <p class="text-gray-400 text-xs pt-2">Export emits a static LEVELS array and wipes the campaign generator. For Dungeon 1..30 edit CAMPAIGN_CURVE in registry.js.</p>
         </div>
       `;
 
@@ -368,14 +368,14 @@
       };
       const validation = validateLevelDefinition(updatedLevel);
       if (!validation.valid) {
-        alert(`❌ Проверьте уровень:\n${validation.errors.join('\n')}`);
+        alert(`❌ Check the dungeon:\n${validation.errors.join('\n')}`);
         return;
       }
       if (index < 0) return;
       currentLevels[index] = updatedLevel;
       selectedLevel = updatedLevel;
       saveLevelOrder();
-      alert('✅ Уровень сохранен! Скопируйте код через "Экспорт" и обновите registry.js');
+      alert('✅ Dungeon saved! Copy the code via "EXPORT" and update registry.js');
       renderLevelsList();
     }
 
@@ -388,12 +388,12 @@
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
-        alert('📋 Код скопирован! Вставьте его в registry.js');
+        alert('📋 Code copied! Paste it into registry.js');
       };
 
       if (typeof navigator.clipboard?.writeText === 'function') {
         navigator.clipboard.writeText(code).then(() => {
-          alert('📋 Код скопирован в буфер обмена! Вставьте его в registry.js');
+          alert('📋 Code copied to the clipboard! Paste it into registry.js');
         }).catch(fallbackCopy);
       } else {
         fallbackCopy();
@@ -401,11 +401,11 @@
     }
 
     function deleteLevel(index) {
-      if (confirm(`Удалить уровень "${currentLevels[index].name}"?`)) {
+      if (confirm(`Delete the dungeon "${currentLevels[index].name}"?`)) {
         currentLevels.splice(index, 1);
         saveLevelOrder();
         renderLevelsList();
-        document.getElementById('editor-content').innerHTML = '<p class="text-gray-400">Выберите уровень для редактирования</p>';
+        document.getElementById('editor-content').innerHTML = '<p class="text-gray-400">Pick a dungeon to edit</p>';
       }
     }
 
@@ -442,11 +442,11 @@
       };
       const validation = validateLevelDefinition(newLevel);
       if (!validation.valid) {
-        alert(`❌ Проверьте уровень:\n${validation.errors.join('\n')}`);
+        alert(`❌ Check the dungeon:\n${validation.errors.join('\n')}`);
         return;
       }
       if (currentLevels.some(level => level.id === newLevel.id)) {
-        alert('❌ Уровень с таким ID уже существует');
+        alert('❌ A dungeon with this ID already exists');
         return;
       }
 

@@ -17,7 +17,7 @@ globalThis.localStorage = {
 const { loadMetaState, addGold, getGameState } = await import('../state.js');
 const { validateLevelDefinition, getLevelById } = await import('../registry.js');
 
-// Уровни берём по id, чтобы тесты не зависели от порядка в реестре.
+// Levels are fetched by id so the tests do not depend on registry order.
 const TUTORIAL_LEVEL = getLevelById('tutorial');
 const CAMPAIGN_LEVEL = getLevelById('dungeon_01');
 

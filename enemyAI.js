@@ -52,14 +52,14 @@ export function getThreatMaps(rows, playerPos) {
     return cachedThreatMaps;
   }
 
-  // Map<cellKey, Set<enemyId>> - для каждой клетки храним список врагов, которые её видят
-  const idleThreatCells = new Map(); // Враги, которые НЕ видят игрока
-  const alertThreatCells = new Map(); // Враги, которые ВИДЯТ игрока
+  // Map<cellKey, Set<enemyId>> - for every cell we keep the list of enemies that can see it
+  const idleThreatCells = new Map(); // Enemies that do NOT see the player
+  const alertThreatCells = new Map(); // Enemies that DO see the player
 
   for (let y = 0; y < rows.length; y++) {
     for (let x = 0; x < DIMS.COLS; x++) {
       const cell = rows[y][x];
-      // Пропускаем мёртвых врагов
+      // Skip dead enemies
       if (cell.type !== OBJECT_TYPES.ENEMY || !cell.data || cell.data.currentHp <= 0) continue;
 
       const enemy = cell.data;
@@ -67,30 +67,30 @@ export function getThreatMaps(rows, playerPos) {
       const isAlert = canEnemySeePlayer(enemy, x, y, playerPos, rows);
       const targetMap = isAlert ? alertThreatCells : idleThreatCells;
 
-      // Добавляем клетку самого врага
+      // Add the enemy's own cell
       const cellKey = `${x},${y}`;
       if (!targetMap.has(cellKey)) targetMap.set(cellKey, new Set());
       targetMap.get(cellKey).add(enemyId);
 
-      // Добавляем клетки влево от врага
+      // Add the cells to the left of the enemy
       for (let i = 1; i <= enemy.visionRange; i++) {
         const checkX = x - i;
         if (checkX < 0) break;
         const checkCell = rows[y][checkX];
         if (checkCell.type === OBJECT_TYPES.WALL) break;
-        // Добавляем ВСЕ клетки, не только с врагами
+        // Add ALL cells, not just the ones holding enemies
         const key = `${checkX},${y}`;
         if (!targetMap.has(key)) targetMap.set(key, new Set());
         targetMap.get(key).add(enemyId);
       }
       
-      // Добавляем клетки вправо от врага
+      // Add the cells to the right of the enemy
       for (let i = 1; i <= enemy.visionRange; i++) {
         const checkX = x + i;
         if (checkX >= DIMS.COLS) break;
         const checkCell = rows[y][checkX];
         if (checkCell.type === OBJECT_TYPES.WALL) break;
-        // Добавляем ВСЕ клетки, не только с врагами
+        // Add ALL cells, not just the ones holding enemies
         const key = `${checkX},${y}`;
         if (!targetMap.has(key)) targetMap.set(key, new Set());
         targetMap.get(key).add(enemyId);
@@ -157,7 +157,7 @@ export function processEnemyTurns(y, playerOldPos, onAllAttacksComplete) {
     const originalX = enemyCell.visual.x;
     const originalY = enemyCell.visual.y;
 
-    // Определяем направление к игроку (на момент до его перемещения)
+    // Work out the direction to the player (as of before the player moved)
     const directionToPlayer = Math.sign(playerOldPos.x - enemyX);
     const lungeX = originalX + (directionToPlayer * DIMS.CELL_SIZE * 0.3);
 

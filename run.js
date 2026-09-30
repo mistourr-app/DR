@@ -10,7 +10,7 @@ import { createPRNG, generateArenaObject, spawnArenaObject } from './utils.js';
 import { startTutorial, stopTutorial, updateTutorial, isClickAllowed } from './tutorial.js';
 
 let _onStateChange = () => {};
-let _deathType = 'damage'; // 'damage' или 'exhaustion'
+let _deathType = 'damage'; // 'damage' or 'exhaustion'
 
 function getRowYForSize(y, totalRows, cellSize) {
   const regularRows = totalRows - 2;
@@ -102,8 +102,8 @@ function checkIfPlayerStuck() {
   const { player, rows } = runState;
   const targetY = player.pos.y + 1;
   
-  // Проверяем, есть ли доступные ходы
-  if (targetY >= rows.length) return false; // Достигли конца
+  // Check whether any move is still available
+  if (targetY >= rows.length) return false; // Reached the end
   
   let hasValidMove = false;
   
@@ -169,7 +169,7 @@ export function startRun(levelId) {
   const initialRows = [];
   
   if (levelData.isTutorial && levelData.layout) {
-    // Фиксированный layout для tutorial
+    // Fixed layout for the tutorial
     for (let y = 0; y < levelData.layout.length; y++) {
       const row = [];
       for (let x = 0; x < DIMS.COLS; x++) {
@@ -201,7 +201,7 @@ export function startRun(levelId) {
     }
     startTutorial();
   } else {
-    // Процедурная генерация
+    // Procedural generation
     const { ENEMY, WALL, HEAL, AMMO, ENERGY, ATTACK_BONUS, DEFENSE_BONUS, GOLD } = levelData.chances;
 
   for (let y = 0; y < levelData.rows; y++) {
@@ -250,11 +250,11 @@ export function startRun(levelId) {
       });
     }
     
-    // Проверка: хотя бы одна клетка должна быть проходимой
+    // Check: at least one cell must be passable
     if (y > 0 && y < levelData.rows - 2) {
       const allWalls = row.every(cell => cell.type === OBJECT_TYPES.WALL);
       if (allWalls) {
-        // Освобождаем среднюю клетку
+        // Free up the middle cell
         row[2].type = OBJECT_TYPES.EMPTY;
         row[2].data = null;
       }
@@ -269,13 +269,13 @@ export function startRun(levelId) {
   const bossData = {
     hp: Math.round(playerBaseHp * bossHpMultiplier),
     currentHp: Math.round(playerBaseHp * bossHpMultiplier),
-    label: 'БОСС',
+    label: 'ELDER',
     color: '#FF58F4',
   };
 
   const bossX = 2;
   const bossY = levelData.rows - 1;
-  // Стартовая клетка босса должна быть пустой — объект генерируется при первом ходе
+  // The Elder's starting cell must be empty - the object spawns on the first turn
   initialRows[bossY][bossX].type = OBJECT_TYPES.EMPTY;
   initialRows[bossY][bossX].data = null;
 
@@ -373,7 +373,7 @@ export function processPlayerAction(gx, gy) {
       }
     } else if (gy === player.pos.y + 1 && gy < rows.length) {
       const targetCellForMove = rows[gy]?.[gx];
-      // Если на целевой клетке враг — это ближний бой
+      // If the target cell holds an enemy - this is a melee fight
       if (targetCellForMove?.type === OBJECT_TYPES.ENEMY) {
         processMeleeAttack(gx, gy);
       } else {
@@ -473,7 +473,7 @@ function processPlayerMove(targetX, targetY) {
   runState.turnOwner = 'processing';
   console.log('[TURN] turnOwner = processing');
 
-  // Сначала обрабатываем атаки врагов из текущего ряда
+  // Handle attacks from enemies in the current row first
   const previousY = player.pos.y;
   const previousX = player.pos.x;
   
@@ -487,7 +487,7 @@ function processPlayerMove(targetX, targetY) {
       return;
     }
     
-    // Игрок жив, запускаем анимацию перемещения
+    // Player is alive, run the movement animation
     const targetHeight = (targetY >= runState.totalRows - 2) ? DIMS.CELL_SIZE * 2 : DIMS.CELL_SIZE;
 
     play({
@@ -504,7 +504,7 @@ function processPlayerMove(targetX, targetY) {
       player.pos.x = targetX;
       player.pos.y = targetY;
 
-      // Генерируем объект на клетке откуда ушёл игрок (если арена и клетка пустая)
+      // Spawn an object on the cell the player left behind (arena only, if the cell is empty)
       if (runState.levelPhase === 'boss_arena') {
         const prevCell = rows[previousY][previousX];
         console.log(`[LEAVE_CELL] (${previousX},${previousY}) type=${prevCell.type}`);
@@ -538,7 +538,7 @@ function processPlayerMove(targetX, targetY) {
           player.inventory.ammo = Math.min(player.inventory.maxAmmo, oldAmmo + ammoAmount);
           const actualAdded = player.inventory.ammo - oldAmmo;
           if (actualAdded > 0) {
-            createFloatingText(`+${actualAdded} з.`, '#f59e0b', player.visual);
+            createFloatingText(`+${actualAdded} HP`, '#f59e0b', player.visual);
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
@@ -551,7 +551,7 @@ function processPlayerMove(targetX, targetY) {
           player.energy = Math.min(player.maxEnergy, oldEnergy + energyAmount);
           const actualAdded = player.energy - oldEnergy;
           if (actualAdded > 0) {
-            createFloatingText(`+${actualAdded} э.`, '#3b82f6', player.visual);
+            createFloatingText(`+${actualAdded} EN`, '#3b82f6', player.visual);
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
@@ -561,7 +561,7 @@ function processPlayerMove(targetX, targetY) {
         case OBJECT_TYPES.GOLD: {
           const goldAmount = getCellValue(targetCell.data, CELL_DEFS[OBJECT_TYPES.GOLD].amount);
           runState.goldCollected += goldAmount;
-          createFloatingText(`+${goldAmount} з.`, CELL_DEFS[OBJECT_TYPES.GOLD].color, player.visual);
+          createFloatingText(`+${goldAmount} GOLD`, CELL_DEFS[OBJECT_TYPES.GOLD].color, player.visual);
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
           if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
@@ -571,13 +571,13 @@ function processPlayerMove(targetX, targetY) {
           if (player.inventory.attackBonuses.length < 2) {
             const bonus = getBonusData(targetCell.data, CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].value);
             player.inventory.attackBonuses.push(bonus);
-            createFloatingText(`+${bonus.value} атк.`, CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, player.visual);
+            createFloatingText(`+${bonus.value} ATK`, CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, player.visual);
             emit(Events.ITEM_PICKED, { type: 'attack_bonus', value: bonus.value });
             targetCell.type = OBJECT_TYPES.EMPTY;
             targetCell.data = null;
             if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
           } else {
-            createFloatingText('ПОЛНО', '#6b7280', player.visual);
+            createFloatingText('FULL', '#6b7280', player.visual);
             bossInteractionPending = runState.levelPhase === 'boss_arena';
             targetCell.isAnimating = true;
             play({
@@ -602,13 +602,13 @@ function processPlayerMove(targetX, targetY) {
           if (player.inventory.defenseBonuses.length < 2) {
             const bonus = getBonusData(targetCell.data, CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].value);
             player.inventory.defenseBonuses.push(bonus);
-            createFloatingText(`+${bonus.value} защ.`, CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, player.visual);
+            createFloatingText(`+${bonus.value} GRD`, CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, player.visual);
             emit(Events.ITEM_PICKED, { type: 'defense_bonus', value: bonus.value });
             targetCell.type = OBJECT_TYPES.EMPTY;
             targetCell.data = null;
             if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
           } else {
-            createFloatingText('ПОЛНО', '#6b7280', player.visual);
+            createFloatingText('FULL', '#6b7280', player.visual);
             bossInteractionPending = runState.levelPhase === 'boss_arena';
             targetCell.isAnimating = true;
             play({
@@ -676,7 +676,7 @@ function processPlayerMove(targetX, targetY) {
         }
         case OBJECT_TYPES.ENEMY: {
           bossInteractionPending = runState.levelPhase === 'boss_arena';
-          // Анимация выпадa игрока к врагу
+          // Player lunge animation towards the enemy
           const playerLungeX = player.visual.x + ((targetX - player.pos.x) * DIMS.CELL_SIZE * 0.3);
           const playerLungeY = player.visual.y + DIMS.CELL_SIZE * 0.3;
 
@@ -688,10 +688,10 @@ function processPlayerMove(targetX, targetY) {
             },
             duration: 150,
             onComplete: () => {
-              // Бой происходит в момент контакта
+              // The fight happens at the moment of contact
               const didPlayerWin = processMeleeCombat(targetCell);
 
-              // Возвращаем игрока на место
+              // Return the player to their cell
               play({
                 target: player,
                 props: {
@@ -711,7 +711,7 @@ function processPlayerMove(targetX, targetY) {
                  }
 
                  if (targetCell.data && targetCell.data.currentHp <= 0) {
-                    // Враг побежден — анимация смерти
+                    // Enemy is defeated - death animation
                     targetCell.isAnimating = true;
                     play({
                       target: targetCell,
@@ -733,7 +733,7 @@ function processPlayerMove(targetX, targetY) {
                       }
                     });
                   } else {
-                    // Игрок проиграл бой
+                    // Player lost the fight
                     play({
                       target: targetCell,
                       props: { 'visual.y': targetCell.visual.y + 10 },
@@ -750,7 +750,7 @@ function processPlayerMove(targetX, targetY) {
           break;
         }
         default: {
-          // Пустая клетка или другой тип - ничего не делаем
+          // Empty cell or another type - do nothing
           console.log(`[PLAYER_MOVE] Landed on ${targetCell.type}, no special interaction`);
           break;
         }
@@ -772,8 +772,8 @@ function processPlayerMove(targetX, targetY) {
       
       if (runState.levelPhase === 'dungeon') {
         console.log(`[DUNGEON] Processing dungeon phase, targetCell.type=${targetCell.type}`);
-        // Для всех типов клеток кроме врага завершаем ход сразу
-        // Для врага ход завершится в обработчике боя
+  // For every cell type except an enemy we end the turn immediately
+  // For an enemy the turn ends inside the combat handler
         if (targetCell.type !== OBJECT_TYPES.ENEMY) {
           finalizeTurnAfterMove(targetY);
         } else {
@@ -800,7 +800,7 @@ function processPlayerShot(targetCell) {
   const enemy = targetCell.data;
   const weaponDamage = player.inventory.weapon.damage;
   
-  // Используем универсальную функцию
+  // Use the shared helper
   const actualDamage = calculateAndConsumeAttackBonuses(weaponDamage, enemy.currentHp);
 
   play({
@@ -815,7 +815,7 @@ function processPlayerShot(targetCell) {
         onComplete: () => {
           dealDamageToEnemy(targetCell, actualDamage, false);
           
-          // Сразу после нанесения урона обновляем карты угроз
+          // Refresh the threat maps right after applying damage
           if (enemy && enemy.currentHp <= 0) {
             markThreatMapsDirty();
           }
@@ -894,7 +894,7 @@ function finalizeTurnAfterMove(targetY, resetShot = true) {
   }
   cleanupDeadEnemies(rows);
   
-  // Обновляем карты угроз после перемещения игрока
+  // Refresh the threat maps after the player moved
   markThreatMapsDirty();
 
   console.log('[TURN] Returning turn to player');
@@ -903,7 +903,7 @@ function finalizeTurnAfterMove(targetY, resetShot = true) {
   }
   runState.turnOwner = 'player';
   
-  // Проверяем, не застрял ли игрок
+  // Check whether the player got stuck
   checkIfPlayerStuck();
 }
 
@@ -923,8 +923,8 @@ function createFloatingText(text, color, position) {
 }
 
 /**
- * Отдельная функция для ближнего боя (клик на врага на следующем ряду)
- * Игрок перемещается на клетку врага и дерётся
+ * Dedicated melee handler (tapping an enemy in the next row)
+ * The player moves onto the enemy's cell and fights
  */
 function processMeleeAttack(enemyX, enemyY) {
   const { runState } = getGameState();

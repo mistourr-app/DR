@@ -1,13 +1,13 @@
-// Версия данных - увеличивайте при изменении уровней, врагов или баланса
+// Data version - bump when levels, enemies or balance change
 export const DATA_VERSION = 3;
 
-// Уровни, заданные вручную: обучение и отладочные полигоны.
-// Кампания Dungeon 1..30 генерируется из CAMPAIGN_CURVE.
+// Hand-authored levels: the tutorial and the debug arenas.
+// The Dungeon 1..30 campaign is generated from CAMPAIGN_CURVE.
 const STATIC_LEVELS = [
   {
     "id": "tutorial",
     "rows": 13,
-    "name": "Обучение",
+    "name": "TUTORIAL",
     "bossHpMultiplier": 1,
     "isTutorial": true,
     "layout": [
@@ -161,7 +161,7 @@ const STATIC_LEVELS = [
   {
     "id": "test_arena",
     "rows": 6,
-    "name": "Тестовый полигон",
+    "name": "TEST ARENA",
     "bossHpMultiplier": 1.5,
     "hidden": true,
     "chances": {
@@ -178,7 +178,7 @@ const STATIC_LEVELS = [
   {
     "id": "debug_boss",
     "rows": 3,
-    "name": "[DEBUG] Арена",
+    "name": "[DEBUG] ARENA",
     "bossHpMultiplier": 1,
     "isTutorial": false,
     "hidden": true,
@@ -195,8 +195,8 @@ const STATIC_LEVELS = [
   }
 ];
 
-// Кривая сложности кампании: линейная интерполяция между первым и последним уровнем.
-// from - значение на Dungeon 1, to - значение на Dungeon 30.
+// Campaign difficulty curve: linear interpolation between the first and last level.
+// from - value on Dungeon 1, to - value on Dungeon 30.
 export const CAMPAIGN_CURVE = {
   total: 30,
   idPrefix: 'dungeon_',
@@ -223,7 +223,7 @@ function buildCampaignLevels(curve) {
   const levels = [];
 
   for (let index = 0; index < curve.total; index += 1) {
-    // Линейный прогресс: 0 на первом уровне, 1 на последнем.
+    // Linear progress: 0 on the first level, 1 on the last one.
     const progress = lastIndex === 0 ? 0 : index / lastIndex;
     const lerp = ({ from, to }) => from + (to - from) * progress;
     const chances = {};
@@ -248,8 +248,8 @@ function buildCampaignLevels(curve) {
 
 export const CAMPAIGN_LEVELS = buildCampaignLevels(CAMPAIGN_CURVE);
 
-// Временное хранилище данных об уровнях.
-// В будущем это будет загружаться из localStorage или сервера.
+// Temporary level data store.
+// In the future this will be loaded from localStorage or a server.
 export const LEVELS = [...STATIC_LEVELS, ...CAMPAIGN_LEVELS];
 
 export const LEVEL_CHANCE_KEYS = [
@@ -293,13 +293,13 @@ function isRecord(value) {
 function validateCellDefinition(cell, rowIndex, cellIndex, rowCount, errors) {
   if (cell === undefined || cell === null) return;
   if (!isRecord(cell)) {
-    errors.push(`layout[${rowIndex}][${cellIndex}] должен быть объектом`);
+    errors.push(`layout[${rowIndex}][${cellIndex}] must be an object`);
     return;
   }
 
   if (cell.type === undefined || cell.type === null || cell.type === '') return;
   if (typeof cell.type !== 'string' || !VALID_CELL_TYPES.has(cell.type.toLowerCase())) {
-    errors.push(`layout[${rowIndex}][${cellIndex}] содержит неизвестный тип`);
+    errors.push(`layout[${rowIndex}][${cellIndex}] has an unknown type`);
     return;
   }
 
@@ -307,19 +307,19 @@ function validateCellDefinition(cell, rowIndex, cellIndex, rowCount, errors) {
   if (type === 'enemy') {
     const enemyType = cell.enemyType || 'TYPE_1';
     if (typeof enemyType !== 'string' || !Object.prototype.hasOwnProperty.call(ENEMY_DEFS, enemyType)) {
-      errors.push(`layout[${rowIndex}][${cellIndex}] содержит неизвестный enemyType`);
+      errors.push(`layout[${rowIndex}][${cellIndex}] has an unknown enemyType`);
     }
   }
 
   if (!['attack_bonus', 'defense_bonus', 'attack_cell', 'heal', 'gold'].includes(type)) return;
   if (cell.data === undefined || cell.data === null) {
     if (type === 'attack_cell') {
-      errors.push(`layout[${rowIndex}][${cellIndex}] требует data.value`);
+      errors.push(`layout[${rowIndex}][${cellIndex}] requires data.value`);
     }
     return;
   }
   if (!isRecord(cell.data)) {
-    errors.push(`layout[${rowIndex}][${cellIndex}].data должен быть объектом`);
+    errors.push(`layout[${rowIndex}][${cellIndex}].data must be an object`);
     return;
   }
 
@@ -328,42 +328,42 @@ function validateCellDefinition(cell, rowIndex, cellIndex, rowCount, errors) {
   const minimum = type === 'attack_bonus' || type === 'defense_bonus' || type === 'attack_cell' ? 1 : 0;
   const maximum = type === 'heal' || type === 'gold' ? MAX_HEAL_AMOUNT : MAX_CELL_VALUE;
   if (value === null || value < minimum || value > maximum) {
-    errors.push(`layout[${rowIndex}][${cellIndex}].data.${dataKey} имеет недопустимое значение`);
+    errors.push(`layout[${rowIndex}][${cellIndex}].data.${dataKey} has an invalid value`);
   }
 
   if (type === 'attack_cell' && rowIndex < rowCount - 2) {
-    errors.push(`layout[${rowIndex}][${cellIndex}] attack_cell разрешён только на арене босса`);
+    errors.push(`layout[${rowIndex}][${cellIndex}] attack_cell is only allowed in the boss arena`);
   }
 }
 
 export function validateLevelDefinition(level) {
   const errors = [];
   if (!isRecord(level)) {
-    return { valid: false, errors: ['Уровень должен быть объектом'] };
+    return { valid: false, errors: ['Level must be an object'] };
   }
 
   if (typeof level.id !== 'string' || level.id.length > 64 || !/^[a-z0-9_-]+$/i.test(level.id)) {
-    errors.push('id должен содержать до 64 латинских букв, цифр, дефиса или подчёркивания');
+    errors.push('id must contain up to 64 latin letters, digits, dashes or underscores');
   }
   if (typeof level.name !== 'string' || level.name.trim() === '' || level.name.length > MAX_LEVEL_NAME_LENGTH) {
-    errors.push(`name обязателен и не должен превышать ${MAX_LEVEL_NAME_LENGTH} символов`);
+    errors.push(`name is required and must not exceed ${MAX_LEVEL_NAME_LENGTH} characters`);
   }
   if (!Number.isInteger(level.rows) || level.rows < 3 || level.rows > MAX_LEVEL_ROWS) {
-    errors.push(`rows должно быть целым числом от 3 до ${MAX_LEVEL_ROWS}`);
+    errors.push(`rows must be an integer from 3 to ${MAX_LEVEL_ROWS}`);
   }
 
   const bossHpMultiplier = toFiniteNumber(level.bossHpMultiplier);
   if (bossHpMultiplier === null || bossHpMultiplier < 0.1 || bossHpMultiplier > MAX_BOSS_HP_MULTIPLIER) {
-    errors.push(`bossHpMultiplier должен быть числом от 0.1 до ${MAX_BOSS_HP_MULTIPLIER}`);
+    errors.push(`bossHpMultiplier must be a number from 0.1 to ${MAX_BOSS_HP_MULTIPLIER}`);
   }
 
   if (level.isTutorial) {
     if (!Array.isArray(level.layout) || level.layout.length !== level.rows) {
-      errors.push('layout должен содержать столько же строк, сколько rows');
+      errors.push('layout must contain as many rows as rows');
     } else {
       level.layout.forEach((row, rowIndex) => {
         if (!Array.isArray(row) || row.length !== 5) {
-          errors.push(`layout[${rowIndex}] должен содержать 5 клеток`);
+          errors.push(`layout[${rowIndex}] must contain 5 cells`);
           return;
         }
         row.forEach((cell, cellIndex) => {
@@ -372,19 +372,19 @@ export function validateLevelDefinition(level) {
       });
     }
   } else if (!isRecord(level.chances)) {
-    errors.push('chances обязателен для обычного уровня');
+    errors.push('chances is required for a regular level');
   } else {
     let total = 0;
     LEVEL_CHANCE_KEYS.forEach((key) => {
       const value = toFiniteNumber(level.chances[key]);
       if (value === null || value < 0 || value > 1) {
-        errors.push(`chances.${key} должен быть числом от 0 до 1`);
+        errors.push(`chances.${key} must be a number from 0 to 1`);
       } else {
         total += value;
       }
     });
     if (total > 1.000001) {
-      errors.push('Сумма chances не должна превышать 1');
+      errors.push('The sum of chances must not exceed 1');
     }
   }
 
@@ -411,62 +411,62 @@ export const OBJECT_TYPES = {
 
 export const ENEMY_DEFS = {
   TYPE_1: {
-    label: 'СНАЙПЕР',
+    label: 'ARCANIST',
     hp: 4,
-    visionRange: 4, // Видит на 3 клетки вперед
-    actionRange: 4, // Может атаковать с расстояния в 3 клетки
+    visionRange: 4, // Sees 4 cells ahead
+    actionRange: 4, // Can attack from 4 cells away
     color: '#FF1F1F'
   },
   TYPE_2: {
-    label: 'СТРАЖ',
+    label: 'SPEARMAN',
     hp: 8,
-    visionRange: 2, // Видит на 2 клетки вперед
-    actionRange: 2, // Может атаковать с расстояния в 2 клетки
+    visionRange: 2, // Sees 2 cells ahead
+    actionRange: 2, // Can attack from 2 cells away
     color: '#FF1F1F'
   }
 };
 
 export const CELL_DEFS = {
   [OBJECT_TYPES.WALL]: {
-    label: 'Стена',
+    label: 'WALL',
     color: '#3F4556',
     blocksMovement: true
   },
   [OBJECT_TYPES.HEAL]: {
-    label: 'ЗДОРОВЬЕ',
+    label: 'HEALTH',
     value: '+6',
     amount: 6,
     color: '#10B981'
   },
   [OBJECT_TYPES.AMMO]: {
-    label: 'ЗАРЯДЫ',
+    label: 'BOLTS',
     value: '+2',
     amount: 2,
     color: '#5CFAFF'
   },
   [OBJECT_TYPES.ENERGY]: {
-    label: 'ЭНЕРГИЯ',
+    label: 'ENERGY',
     value: '+10',
     amount: 10,
     color: '#9E6DFF'
   },
   [OBJECT_TYPES.ATTACK_BONUS]: {
-    label: 'АТАКА',
+    label: 'ATTACK',
     value: 5,
     color: '#FF731B'
   },
   [OBJECT_TYPES.DEFENSE_BONUS]: {
-    label: 'ЗАЩИТА',
+    label: 'GUARD',
     value: 5,
     color: '#0084FF'
   },
   [OBJECT_TYPES.ATTACK_CELL]: {
-    label: 'АТАКА',
-    value: 10, // Урон по умолчанию для клетки атаки
+    label: 'ATTACK',
+    value: 10, // Default damage of an attack cell
     color: '#C40014'
   },
   [OBJECT_TYPES.GOLD]: {
-    label: 'ЗОЛОТО',
+    label: 'GOLD',
     value: '+5',
     amount: 5,
     color: '#FFE761'

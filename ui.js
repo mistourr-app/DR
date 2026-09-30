@@ -35,7 +35,7 @@ function applyAssetBackground(element, assetId) {
   const asset = getAssetDefinition(assetId);
   const url = getAssetUrl(assetId);
   if (!element || !asset || !url) return;
-  // Контент перерисовывается каждый кадр, поэтому не пересоздаём стили без изменения URL.
+  // The content is redrawn every frame, so do not recreate styles while the URL is unchanged.
   if (element.dataset.assetApplied === url) return;
   element.dataset.assetApplied = url;
 
@@ -63,7 +63,7 @@ function applyAssetBackground(element, assetId) {
   element.style.backgroundSize = asset.mode === 'cover' ? 'cover' : 'contain';
 }
 
-// Получаем ссылки на все оверлеи один раз
+// Grab references to every overlay once
 const levelSelectScreen = document.getElementById('level-select-screen');
 const victoryScreen = document.getElementById('victory-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
@@ -97,14 +97,14 @@ export function updateGoldCounter() {
 }
 
 /**
- * Показывает экран выбора уровня и создает кнопки.
- * @param {function(string): void} onLevelSelect - Колбэк, вызываемый при выборе уровня.
+ * Shows the level select screen and builds the buttons.
+ * @param {function(string): void} onLevelSelect - Callback invoked when a level is picked.
  */
 export function showLevelSelectScreen(onLevelSelect) {
   hideAllScreens();
   if (levelSelectScreen) {
     levelSelectScreen.style.display = 'flex';
-    // Заголовок не должен наезжать на счётчик золота: отступ сверху равен высоте верхней панели.
+    // The title must not overlap the gold counter: the top padding equals the top bar height.
     const topBarOffset = topUiBar ? topUiBar.offsetHeight : 0;
     levelSelectScreen.style.paddingTop = `${topBarOffset + 20}px`;
     applyAssetBackground(levelSelectScreen, 'ui.screen.level-select');
@@ -134,39 +134,39 @@ export function showLevelSelectScreen(onLevelSelect) {
       }));
     }
 
-    // Пересоздаем кнопки каждый раз для обновления порядка
+    // Rebuild the buttons every time so the order stays in sync
     container.innerHTML = '';
-    // Скрытые уровни пропускаем. Список перевёрнут: последний уровень вверху, первый внизу.
+    // Hidden levels are skipped. The list is reversed: the last level on top, the first at the bottom.
     const visibleLevels = orderedLevels.filter(level => !level.hidden).reverse();
     visibleLevels.forEach(level => {
       const button = document.createElement('button');
       button.id = `level-btn-${level.id}`;
-      button.innerText = `${level.name} (${level.rows} рядов)`;
+      button.innerText = `${level.name} (${level.rows} ROWS)`;
       button.className = 'button';
       button.addEventListener('click', () => onLevelSelect(level.id));
       container.appendChild(button);
     });
-    // Обучение лежит внизу списка, поэтому открываем меню сразу на нём.
+    // The tutorial sits at the bottom of the list, so open the menu right on it.
     container.scrollTop = container.scrollHeight;
   }
 }
 
 /**
- * Отрисовывает верхнюю панель UI (счетчик рядов, кнопка выхода).
- * @param {object} runState - Текущее состояние забега.
- * @param {function(): void} onExit - Колбэк для кнопки "Выход".
+ * Renders the top UI bar (row counter, exit button).
+ * @param {object} runState - The current run state.
+ * @param {function(): void} onExit - Callback for the "EXIT" button.
  */
 export function renderTopBar(runState, onExit) {
   if (!topUiBar) return;
   applyAssetBackground(topUiBar, 'ui.hud.top');
   applyAssetBackground(inventoryDisplay, 'ui.hud.bottom');
 
-  // Инициализируем содержимое только один раз, чтобы не терять обработчик событий
+  // Initialise the content only once so the event handler is not lost
   if (!topUiBar.dataset.initialized) {
     topUiBar.dataset.initialized = 'true';
     topUiBar.innerHTML = `
       <div class="flex items-center justify-between w-full h-full px-2">
-        <button id="exit-run-btn" class="button-secondary">Выход</button>
+        <button id="exit-run-btn" class="button-secondary">EXIT</button>
         <div id="boss-inventory-display" class="flex items-center justify-center gap-2"></div>
         <div id="row-counter" class="text-lg font-bold text-gray-300"></div>
       </div>
@@ -174,21 +174,21 @@ export function renderTopBar(runState, onExit) {
     document.getElementById('exit-run-btn').addEventListener('click', onExit);
   }
 
-  // Отрисовка инвентаря босса, если мы на арене
+  // Render the Elder's inventory when we are on the arena
   const bossInventoryDisplay = document.getElementById('boss-inventory-display');
   applyAssetBackground(bossInventoryDisplay, 'ui.hud.boss-inventory');
   if (bossInventoryDisplay && runState?.levelPhase === 'boss_arena' && runState.boss) {
     const { inventory } = runState.boss;
     let bossInventoryHtml = '';
-    // Слоты для бонусов атаки босса
+    // Slots for the Elder's attack bonuses
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.attackBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, null, true, 'ui.icon.attack') : createSlot('-', 'Атака', '#6b7280', true, null, null, true, 'ui.slot.boss');
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'ATTACK', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, null, true, 'ui.icon.attack') : createSlot('-', 'ATTACK', '#6b7280', true, null, null, true, 'ui.slot.boss');
     }
-    // Слоты для бонусов защиты босса
+    // Slots for the Elder's defense bonuses
     for (let i = 0; i < 2; i++) {
       const bonus = inventory.defenseBonuses[i];
-      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, true, 'ui.icon.defense') : createSlot('-', 'Защита', '#6b7280', true, null, null, true, 'ui.slot.boss');
+      bossInventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'GUARD', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, true, 'ui.icon.defense') : createSlot('-', 'GUARD', '#6b7280', true, null, null, true, 'ui.slot.boss');
     }
     bossInventoryDisplay.innerHTML = bossInventoryHtml;
     applyAssetBackgrounds(bossInventoryDisplay);
@@ -196,15 +196,15 @@ export function renderTopBar(runState, onExit) {
     bossInventoryDisplay.innerHTML = '';
   }
 
-  // Обновляем динамические данные (счетчик рядов)
+  // Update the dynamic parts (row counter)
   const rowCounterEl = document.getElementById('row-counter');
   if (rowCounterEl && runState) {
-    // +1, так как ряды 0-индексированы
-    rowCounterEl.innerText = `Ряд: ${runState.player.pos.y + 1} / ${runState.totalRows}`;
+    // +1 because rows are 0-indexed
+    rowCounterEl.innerText = `ROW: ${runState.player.pos.y + 1} / ${runState.totalRows}`;
   }
 }
 
-/** Сбрасывает инициализацию верхней панели, чтобы ее можно было создать заново. */
+/** Resets the top bar initialisation so it can be built again from scratch. */
 export function resetTopBar() {
   if (topUiBar) {
     topUiBar.dataset.initialized = '';
@@ -213,14 +213,14 @@ export function resetTopBar() {
 }
 
 /**
- * Создает HTML-разметку для одного слота инвентаря.
- * @param {string} value - Значение для отображения в слоте.
- * @param {string} label - Подпись под слотом.
- * @param {string} valueColorClass - Tailwind CSS класс для цвета значения.
- * @param {boolean} isEmpty - Если true, слот будет полупрозрачным.
- * @param {string|null} [secondaryValue] - Необязательное второе значение, отображаемое под основным.
- * @param {boolean} [isSmall=false] - Если true, используется уменьшенный размер для инвентаря босса.
- * @returns {string} - HTML-строка.
+ * Builds the HTML for a single inventory slot.
+ * @param {string} value - Value shown inside the slot.
+ * @param {string} label - Caption under the slot.
+ * @param {string} valueColorClass - Tailwind CSS class for the value colour.
+ * @param {boolean} isEmpty - When true the slot is rendered semi-transparent.
+ * @param {string|null} [secondaryValue] - Optional second value rendered under the main one.
+ * @param {boolean} [isSmall=false] - When true a reduced size is used for the Elder inventory.
+ * @returns {string} - An HTML string.
  */
 function createSlot(value, label, valueColor = '#ffffff', isEmpty = false, secondaryValue = null, secondaryColor = null, isSmall = false, assetId = null) {
   const emptyClass = isEmpty ? 'opacity-40' : '';
@@ -230,12 +230,12 @@ function createSlot(value, label, valueColor = '#ffffff', isEmpty = false, secon
   const safeSecondaryValue = secondaryValue === null || secondaryValue === undefined ? '' : escapeHtml(secondaryValue);
   const safeValueColor = /^#[0-9a-f]{3,8}$/i.test(valueColor) ? valueColor : '#ffffff';
   const safeSecondaryColor = /^#[0-9a-f]{3,8}$/i.test(secondaryColor || '') ? secondaryColor : '#d1d5db';
-  // Обертка для слота и его подписи
+  // Wrapper for the slot and its caption
   return `
     <div class="flex flex-col items-center">
       <div class="flex flex-col items-center justify-center ${sizeClasses} bg-gray-800 border border-gray-600 rounded-md p-1 ${emptyClass}"${assetId ? ` data-asset-id="${escapeHtml(assetId)}"` : ''}>
         <span class="text-2xl font-black leading-tight" style="color: ${safeValueColor};">${safeValue}</span>
-        <!-- Вторичный текст, используется для зарядов арбалета -->
+        <!-- Secondary text, used for the crossbow bolts -->
         ${safeSecondaryValue ? `<span class="text-xs font-bold" style="color: ${safeSecondaryColor};">${safeSecondaryValue}</span>` : ''}
       </div>
       <span class="text-xs uppercase text-gray-400 font-semibold mt-1">${safeLabel}</span>
@@ -244,8 +244,8 @@ function createSlot(value, label, valueColor = '#ffffff', isEmpty = false, secon
 }
 
 /**
- * Отрисовывает UI во время забега (здоровье, заряды и т.д.)
- * @param {object} runState - Текущее состояние забега.
+ * Renders the in-run UI (health, bolts, etc.)
+ * @param {object} runState - The current run state.
  */
 export function renderUi(runState) {
   if (!runState || !inventoryDisplay) return;
@@ -253,60 +253,60 @@ export function renderUi(runState) {
   const { inventory } = runState.player;
   let inventoryHtml = '';
 
-  // Слот для арбалета
+  // Crossbow slot
   const weapon = inventory.weapon;
   if (weapon?.type === 'crossbow') {
     inventoryHtml += createSlot(
       `${weapon.damage}`, 
-      'Арбалет', 
-      '#ffffff', // Урон белым
+      'CROSSBOW', 
+      '#ffffff', // Damage in white
       false, 
       `${inventory.ammo}/${inventory.maxAmmo}`,
-      CELL_DEFS[OBJECT_TYPES.AMMO].color, // Заряды цветом клеток
+      CELL_DEFS[OBJECT_TYPES.AMMO].color, // Bolts in the cell colour
       false,
       'ui.icon.crossbow'
     );
   }
 
-  // Слоты для бонусов атаки (всегда 2)
+  // Slots for attack bonuses (always 2)
   for (let i = 0; i < 2; i++) {
     const bonus = inventory.attackBonuses[i];
-    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Атака', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, null, false, 'ui.icon.attack') : createSlot('-', 'Атака', '#6b7280', true, null, null, false, 'ui.slot.player');
+    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'ATTACK', CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, false, null, null, false, 'ui.icon.attack') : createSlot('-', 'ATTACK', '#6b7280', true, null, null, false, 'ui.slot.player');
   }
 
-  // Слоты для бонусов защиты (всегда 2)
+  // Slots for defense bonuses (always 2)
   for (let i = 0; i < 2; i++) {
     const bonus = inventory.defenseBonuses[i];
-    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'Защита', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, false, 'ui.icon.defense') : createSlot('-', 'Защита', '#6b7280', true, null, null, false, 'ui.slot.player');
+    inventoryHtml += bonus ? createSlot(`+${bonus.value}`, 'GUARD', CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, false, null, null, false, 'ui.icon.defense') : createSlot('-', 'GUARD', '#6b7280', true, null, null, false, 'ui.slot.player');
   }
 
-  // Используем innerHTML, так как это простой и быстрый способ для такого UI
+  // We use innerHTML because it is a simple and fast way to build this UI
   inventoryDisplay.innerHTML = inventoryHtml;
   applyAssetBackgrounds(inventoryDisplay);
 }
 
 /**
- * Показывает экран поражения.
- * @param {function(): void} onRestart - Колбэк для кнопки "Попробовать снова".
- * @param {function(): void} onGoToMenu - Колбэк для кнопки "Меню уровней".
- * @param {string} deathType - Тип смерти: 'damage' или 'exhaustion'
+ * Shows the defeat screen.
+ * @param {function(): void} onRestart - Callback for the "TRY AGAIN" button.
+ * @param {function(): void} onGoToMenu - Callback for the "DUNGEON SELECT" button.
+ * @param {string} deathType - Cause of death: 'damage' or 'exhaustion'
  */
 export function showGameOverScreen(onRestart, onGoToMenu, deathType = 'damage') {
   if (gameOverScreen) {
     applyAssetBackground(gameOverScreen, 'ui.screen.defeat');
-    // Устанавливаем текст в зависимости от типа смерти
+    // Set the text depending on the cause of death
     const titleEl = document.getElementById('game-over-title');
     const messageEl = document.getElementById('game-over-message');
     
     if (deathType === 'exhaustion') {
-      titleEl.textContent = 'ИСТОЩЕНИЕ';
-      messageEl.innerHTML = 'Ты застрял без энергии из-за своей опрометчивости.<br>Всегда следи за запасом энергии!';
+      titleEl.textContent = 'EXHAUSTED';
+      messageEl.innerHTML = 'You pushed on with nothing left to spend.<br>Watch your energy reserves!';
     } else {
-      titleEl.textContent = 'СИСТЕМА ПОВРЕЖДЕНА';
-      messageEl.textContent = 'Ваше здоровье упало до нуля';
+      titleEl.textContent = 'YOUR LIGHT FADES';
+      messageEl.textContent = 'Your vitality drained to nothing';
     }
     
-    // Показываем с задержкой
+    // Reveal it after a delay
     gameOverScreen.style.display = 'flex';
     gameOverScreen.style.opacity = '0';
     
@@ -314,7 +314,7 @@ export function showGameOverScreen(onRestart, onGoToMenu, deathType = 'damage') 
       gameOverScreen.style.opacity = '1';
     });
 
-    // Используем тот же подход с cloneNode, чтобы всегда иметь свежие колбэки
+    // Reuse the cloneNode approach so the callbacks are always fresh
     const restartBtn = document.getElementById('restart-level-btn');
     const toMenuBtn = document.getElementById('game-over-to-menu-btn');
 
@@ -329,8 +329,8 @@ export function showGameOverScreen(onRestart, onGoToMenu, deathType = 'damage') 
 }
 
 /**
- * Показывает экран победы.
- * @param {function(): void} onGoToMenu - Колбэк для кнопки "Меню уровней".
+ * Shows the victory screen.
+ * @param {function(): void} onGoToMenu - Callback for the "DUNGEON SELECT" button.
  */
 export function showVictoryScreen(onGoToMenu) {
   if (victoryScreen) {

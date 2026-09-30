@@ -77,9 +77,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate: отдаём кэш сразу, но обновляем его в фоне,
-  // поэтому правка JS/HTML попадает в игру уже со следующей загрузки
-  // без ручного поднятия версии кэша.
+    // Stale-while-revalidate: serve the cache right away but refresh it in the background,
+    // so a JS/HTML fix reaches the game on the next load
+    // without having to bump the cache version by hand.
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachedResponse = await cache.match(request);
