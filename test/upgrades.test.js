@@ -26,7 +26,8 @@ const {
   getProgress,
   setCurrentLevel,
   setAllLevelsUnlocked,
-  resetProgress,
+  resetBuildAndCampaign,
+  resetAllProgress,
   getGameState,
 } = await import('../state.js');
 
@@ -254,17 +255,56 @@ test('the unlock cheat is opt in and survives a save round trip', () => {
   assert.equal(setAllLevelsUnlocked('yes'), false, 'only an explicit true enables it');
 });
 
-test('resetProgress clears upgrades and progress but keeps gold', () => {
+test('resetBuildAndCampaign clears upgrades and progress but keeps gold', () => {
   freshPlayer(777, { hp: 5, energy: 3 });
   setCurrentLevel(9);
   setAllLevelsUnlocked(true);
 
-  resetProgress();
+  resetBuildAndCampaign();
 
   assert.deepEqual(getGameState().metaState.upgrades, {});
   assert.equal(getProgress().current, 1);
   assert.equal(getProgress().allUnlocked, false);
-  assert.equal(getGameState().metaState.gold, 777, 'gold is never wiped by a reset');
+  assert.equal(getGameState().metaState.gold, 777, 'gold is never wiped by a build reset');
+});
+
+test('resetAllProgress is a full fresh start', () => {
+  freshPlayer(4321, { hp: 8, energy: 5, weaponDamage: 5, maxAmmo: 3 });
+  setCurrentLevel(27);
+  setAllLevelsUnlocked(true);
+
+  resetAllProgress();
+
+  const { gold, upgrades, progress } = getGameState().metaState;
+
+  assert.equal(gold, 0, 'gold must be zeroed');
+  assert.deepEqual(upgrades, {}, 'every upgrade must be gone');
+  assert.equal(progress.current, 1, 'only the first dungeon may stay reachable');
+  assert.equal(progress.allUnlocked, false, 'the unlock cheat must not survive a reset');
+
+  // The player must be back on the untouched base kit.
+  assert.deepEqual(resolvePlayerStats(upgrades), resolvePlayerStats({}));
+
+  // And it has to reach storage, otherwise a reload would bring the old save back.
+  const saved = JSON.parse(storage.get('dcc_meta'));
+  assert.equal(saved.gold, 0);
+  assert.deepEqual(saved.upgrades, {});
+  assert.deepEqual(saved.progress, { current: 1, allUnlocked: false });
+});
+
+test('a full reset leaves the level layout settings alone', () => {
+  // levelOrder and levelVisibility are the admin's own settings. Wiping them
+  // would un-hide dev dungeons as a side effect of a player reset.
+  // freshPlayer clears storage, so the layout keys have to be written after it.
+  freshPlayer(100, { hp: 2 });
+  storage.set('levelOrder', JSON.stringify(['dungeon_02', 'dungeon_01']));
+  storage.set('levelVisibility', JSON.stringify({ test_arena: true }));
+  setCurrentLevel(5);
+
+  resetAllProgress();
+
+  assert.equal(JSON.parse(storage.get('levelOrder'))[0], 'dungeon_02', 'order must survive');
+  assert.equal(JSON.parse(storage.get('levelVisibility')).test_arena, true, 'visibility must survive');
 });
 
 test('gold only ever grows through addGold', () => {

@@ -48,7 +48,16 @@
         <div id="cheat-progress" class="text-sm text-gray-400"></div>
         <div class="flex gap-2">
           <button id="cheat-gold" class="flex-1 px-4 py-2 bg-yellow-700 hover:bg-yellow-800 rounded text-sm">+1000 gold</button>
-          <button id="cheat-reset-progress" class="flex-1 px-4 py-2 bg-red-800 hover:bg-red-900 rounded text-sm">Reset progress</button>
+          <button id="cheat-reset-build" class="flex-1 px-4 py-2 bg-red-800 hover:bg-red-900 rounded text-sm">Reset build &amp; campaign</button>
+        </div>
+        <div>
+          <button id="cheat-reset-all" class="w-full px-4 py-2 bg-red-950 hover:bg-black rounded text-sm border border-red-800">
+            ⚠ FULL RESET — wipes gold, upgrades and campaign
+          </button>
+          <p class="text-gray-500 text-xs mt-1">
+            Back to a fresh save: gold is zeroed, every upgrade is gone and only Dungeon 1 is
+            reachable. Level order and hidden levels are kept, since those are layout settings.
+          </p>
         </div>
       </div>
     </div>
@@ -84,7 +93,7 @@
 
   <script type="module">
     import { LEVELS, validateLevelDefinition } from './registry.js';
-    import { loadMetaState, getGameState, setAllLevelsUnlocked, resetProgress, addGold } from './state.js';
+    import { loadMetaState, getGameState, setAllLevelsUnlocked, resetBuildAndCampaign, resetAllProgress, addGold } from './state.js';
 
     // Cheats live here because the game itself only ever grants progress.
     loadMetaState();
@@ -98,7 +107,10 @@
 
       const progressLabel = document.getElementById('cheat-progress');
       const renderProgress = () => {
-        progressLabel.textContent = `Current dungeon: ${getGameState().metaState.progress.current} · gold: ${getGameState().metaState.gold}`;
+        const { gold, upgrades, progress } = getGameState().metaState;
+        const bought = Object.values(upgrades).reduce((sum, level) => sum + level, 0);
+        progressLabel.textContent = `Current dungeon: ${progress.current} · gold: ${gold} · upgrades bought: ${bought}`
+          + (progress.allUnlocked ? ' · ALL UNLOCKED' : '');
       };
       renderProgress();
 
@@ -106,8 +118,19 @@
         addGold(1000);
         renderProgress();
       });
-      document.getElementById('cheat-reset-progress').addEventListener('click', () => {
-        resetProgress();
+
+      // Build and campaign only, the gold bank survives.
+      document.getElementById('cheat-reset-build').addEventListener('click', () => {
+        if (!confirm('Reset upgrades and campaign position? Gold is kept.')) return;
+        resetBuildAndCampaign();
+        unlockToggle.checked = false;
+        renderProgress();
+      });
+
+      // Full fresh start, gold included.
+      document.getElementById('cheat-reset-all').addEventListener('click', () => {
+        if (!confirm('Wipe everything?\n\nGold goes to zero, every upgrade is lost and only Dungeon 1 stays reachable. This cannot be undone.')) return;
+        resetAllProgress();
         unlockToggle.checked = false;
         renderProgress();
       });

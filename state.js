@@ -199,8 +199,24 @@ export function setAllLevelsUnlocked(enabled) {
   return gameState.metaState.progress.allUnlocked;
 }
 
-// Clears all progress and upgrades, keeping gold. Used by the admin panel.
-export function resetProgress() {
+// Wipes the build and the campaign position, but keeps the gold bank so a
+// designer can re-test the first screens without grinding again. Used by the
+// admin panel.
+export function resetBuildAndCampaign() {
+  gameState.metaState.upgrades = {};
+  gameState.metaState.progress = { current: 1, allUnlocked: false };
+  saveMetaState();
+}
+
+// Full fresh start: gold, upgrades and campaign position all back to their
+// initial values, so only the first dungeon is reachable and the player stats
+// are the untouched base kit from balance.csv.
+//
+// Deliberately leaves levelOrder and levelVisibility alone: those are the
+// admin's own layout and QA settings, not player progress, and wiping them
+// would un-hide dev dungeons as a side effect.
+export function resetAllProgress() {
+  gameState.metaState.gold = 0;
   gameState.metaState.upgrades = {};
   gameState.metaState.progress = { current: 1, allUnlocked: false };
   saveMetaState();
