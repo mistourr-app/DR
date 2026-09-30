@@ -1,5 +1,5 @@
 import { getGameState, setAppState, createRunId, isRunActive } from './state.js';
-import { getLevelById, validateLevelDefinition, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS, CAMPAIGN_CURVE, PLAYER_DEFS, rollEnemyHp, rollEnemyType } from './registry.js';
+import { getLevelById, validateLevelDefinition, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS, CAMPAIGN_CURVE, PLAYER_DEFS, resolvePlayerStats, rollEnemyHp, rollEnemyType } from './registry.js';
 import { DIMS, AppState } from './config.js';
 import { play, clearAnimations, scheduleRunCallback, resizeAnimations } from './animation.js';
 import { Events, emit, clear as clearEvents } from './events.js';
@@ -30,10 +30,14 @@ function getCellValue(data, fallback, minimum = 0) {
   return Math.max(minimum, value);
 }
 
-function getBonusData(data, fallback) {
+// Builds a bonus stack entry. `value` is authoritative: every bonus cell carries
+// its own value from spawn time, so a fallback argument would never be read and
+// an upgraded bonus value could not be applied at pickup.
+function getBonusData(data, value) {
+  const amount = Number(value);
   return {
     ...(data && typeof data === 'object' ? data : {}),
-    value: getCellValue(data, fallback, 1),
+    value: Number.isFinite(amount) && amount >= 1 ? amount : 1,
   };
 }
 
@@ -301,6 +305,12 @@ export function startRun(levelId) {
   };
   const isDebugBoss = levelId === 'debug_boss';
   const startPos = { x: 2, y: 0 };
+  // The tutorial teaches the base kit, so it deliberately ignores upgrades.
+  // The hidden arenas run the real build so they can be used to test it.
+  const playerStats = resolvePlayerStats(
+    levelData.isTutorial ? {} : getGameState().metaState.upgrades,
+  );
+  const startingAmmo = isDebugBoss ? playerStats.debugAmmo : playerStats.maxAmmo;
   state.runState = {
     runId: createRunId(),
     seed,
@@ -312,16 +322,21 @@ export function startRun(levelId) {
     goldCollected: 0,
     goldCommitted: false,
     visualCellSize: DIMS.CELL_SIZE,
+    playerStats,
     player: {
-      hp: PLAYER_DEFS.hp,
-      maxHp: PLAYER_DEFS.hp,
-      energy: PLAYER_DEFS.energy,
-      maxEnergy: PLAYER_DEFS.energy,
+      hp: playerStats.maxHp,
+      maxHp: playerStats.maxHp,
+      energy: playerStats.maxEnergy,
+      maxEnergy: playerStats.maxEnergy,
       pos: { ...startPos },
       inventory: {
-        weapon: { ...PLAYER_DEFS.weapon },
-        ammo: isDebugBoss ? PLAYER_DEFS.debugAmmo : PLAYER_DEFS.ammo,
-        maxAmmo: isDebugBoss ? PLAYER_DEFS.debugAmmo : PLAYER_DEFS.ammo,
+        weapon: {
+          type: PLAYER_DEFS.weapon.type,
+          range: playerStats.weaponRange,
+          damage: playerStats.weaponDamage,
+        },
+        ammo: startingAmmo,
+        maxAmmo: startingAmmo,
         attackBonuses: [],
         defenseBonuses: [],
       },
@@ -525,16 +540,17 @@ function processPlayerMove(targetX, targetY) {
       console.log(`[PLAYER_MOVE] Animation complete, now at (${targetX},${targetY}), interacting with ${targetCell.type}`);
 
       let bossInteractionPending = false;
+      const playerStats = runState.playerStats;
 
       switch (targetCell.type) {
         case OBJECT_TYPES.HEAL: {
-          const healAmount = getCellValue(targetCell.data, CELL_DEFS[OBJECT_TYPES.HEAL].amount);
+          const healAmount = getCellValue(targetCell.data, playerStats.healPerCell);
           const oldHp = player.hp;
           player.hp = Math.min(player.maxHp, oldHp + healAmount);
           const actualHealed = player.hp - oldHp;
 
           if (actualHealed > 0) {
-            createFloatingText(`+${actualHealed}`, '#10b981', player.visual);
+            createFloatingText(`+${actualHealed} HP`, '#10b981', player.visual);
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
@@ -542,12 +558,12 @@ function processPlayerMove(targetX, targetY) {
           break;
         }
         case OBJECT_TYPES.AMMO: {
-          const ammoAmount = CELL_DEFS[OBJECT_TYPES.AMMO].amount;
+          const ammoAmount = playerStats.boltsPerCell;
           const oldAmmo = player.inventory.ammo;
           player.inventory.ammo = Math.min(player.inventory.maxAmmo, oldAmmo + ammoAmount);
           const actualAdded = player.inventory.ammo - oldAmmo;
           if (actualAdded > 0) {
-            createFloatingText(`+${actualAdded} HP`, '#f59e0b', player.visual);
+            createFloatingText(`+${actualAdded} BOLTS`, '#f59e0b', player.visual);
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
@@ -555,7 +571,7 @@ function processPlayerMove(targetX, targetY) {
           break;
         }
         case OBJECT_TYPES.ENERGY: {
-          const energyAmount = CELL_DEFS[OBJECT_TYPES.ENERGY].amount;
+          const energyAmount = playerStats.energyPerCell;
           const oldEnergy = player.energy;
           player.energy = Math.min(player.maxEnergy, oldEnergy + energyAmount);
           const actualAdded = player.energy - oldEnergy;
@@ -568,7 +584,7 @@ function processPlayerMove(targetX, targetY) {
           break;
         }
         case OBJECT_TYPES.GOLD: {
-          const goldAmount = getCellValue(targetCell.data, CELL_DEFS[OBJECT_TYPES.GOLD].amount);
+          const goldAmount = getCellValue(targetCell.data, playerStats.goldPerCell);
           runState.goldCollected += goldAmount;
           createFloatingText(`+${goldAmount} GOLD`, CELL_DEFS[OBJECT_TYPES.GOLD].color, player.visual);
           targetCell.type = OBJECT_TYPES.EMPTY;
@@ -578,7 +594,7 @@ function processPlayerMove(targetX, targetY) {
         }
         case OBJECT_TYPES.ATTACK_BONUS: {
           if (player.inventory.attackBonuses.length < 2) {
-            const bonus = getBonusData(targetCell.data, CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].value);
+            const bonus = getBonusData(targetCell.data, playerStats.attackBonusValue);
             player.inventory.attackBonuses.push(bonus);
             createFloatingText(`+${bonus.value} ATK`, CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].color, player.visual);
             emit(Events.ITEM_PICKED, { type: 'attack_bonus', value: bonus.value });
@@ -609,7 +625,7 @@ function processPlayerMove(targetX, targetY) {
         }
         case OBJECT_TYPES.DEFENSE_BONUS: {
           if (player.inventory.defenseBonuses.length < 2) {
-            const bonus = getBonusData(targetCell.data, CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].value);
+            const bonus = getBonusData(targetCell.data, playerStats.defenseBonusValue);
             player.inventory.defenseBonuses.push(bonus);
             createFloatingText(`+${bonus.value} GRD`, CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].color, player.visual);
             emit(Events.ITEM_PICKED, { type: 'defense_bonus', value: bonus.value });

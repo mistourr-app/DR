@@ -551,6 +551,85 @@ export const CELL_DEFS = {
 };
 
 // Player stats, straight out of balance.csv. Flat for the whole campaign because
-// meta upgrades are not wired up yet; the Elder takes player hp times
-// bossHpMultiplier and has no field of its own.
+// upgrades are applied on top of it at run start, see resolvePlayerStats.
+// The Elder takes player hp times bossHpMultiplier and has no field of its own,
+// so upgrading might does not make the Elder sturdier.
 export const PLAYER_DEFS = BALANCE.player;
+
+// Player upgrades, straight out of balance.csv. Levels are unlimited and the
+// price of the next level is base + step * currentLevel.
+export const UPGRADE_DEFS = BALANCE.upgrades;
+
+// Own-property lookup. Reading UPGRADE_DEFS[key] directly would find inherited
+// members such as `constructor` and produce NaN prices instead of "unknown".
+export function getUpgradeDef(upgradeKey) {
+  if (typeof upgradeKey !== 'string' || upgradeKey === '') return null;
+  if (!Object.prototype.hasOwnProperty.call(UPGRADE_DEFS, upgradeKey)) return null;
+  return UPGRADE_DEFS[upgradeKey];
+}
+
+// Price in gold of buying one more level of an upgrade.
+export function upgradeCost(upgradeKey, currentLevel) {
+  const def = getUpgradeDef(upgradeKey);
+  if (!def) return null;
+
+  const level = Number(currentLevel);
+  const safeLevel = Number.isFinite(level) && level > 0 ? Math.floor(level) : 0;
+  return def.base + def.step * safeLevel;
+}
+
+// Total gold needed to bring an upgrade from zero to the given level.
+export function upgradeTotalCost(upgradeKey, targetLevel) {
+  const def = getUpgradeDef(upgradeKey);
+  if (!def) return null;
+
+  const target = Number(targetLevel);
+  const levels = Number.isFinite(target) && target > 0 ? Math.floor(target) : 0;
+  return levels * def.base + def.step * ((levels * (levels - 1)) / 2);
+}
+
+// Turns the purchased levels into the effective numbers a run actually uses.
+// The tutorial deliberately ignores upgrades, so callers pass an empty object
+// for it.
+export function resolvePlayerStats(upgrades = {}) {
+  const source = upgrades && typeof upgrades === 'object' ? upgrades : {};
+  const levelOf = key => {
+    const raw = Number(source[key]);
+    return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0;
+  };
+
+  const stats = {
+    maxHp: PLAYER_DEFS.hp,
+    maxEnergy: PLAYER_DEFS.energy,
+    weaponDamage: PLAYER_DEFS.weapon.damage,
+    weaponRange: PLAYER_DEFS.weapon.range,
+    maxAmmo: PLAYER_DEFS.ammo,
+    debugAmmo: PLAYER_DEFS.debugAmmo,
+    attackBonusValue: CELL_DEFS[OBJECT_TYPES.ATTACK_BONUS].value,
+    defenseBonusValue: CELL_DEFS[OBJECT_TYPES.DEFENSE_BONUS].value,
+    energyPerCell: CELL_DEFS[OBJECT_TYPES.ENERGY].amount,
+    boltsPerCell: CELL_DEFS[OBJECT_TYPES.AMMO].amount,
+    healPerCell: CELL_DEFS[OBJECT_TYPES.HEAL].amount,
+    goldPerCell: CELL_DEFS[OBJECT_TYPES.GOLD].amount,
+  };
+
+  Object.keys(UPGRADE_DEFS).forEach((key) => {
+    const levels = levelOf(key);
+    if (levels === 0) return;
+    stats[UPGRADE_KEY_TO_STAT[key]] += UPGRADE_DEFS[key].effect * levels;
+  });
+
+  return stats;
+}
+
+// Which resolved stat each upgrade track feeds.
+export const UPGRADE_KEY_TO_STAT = {
+  hp: 'maxHp',
+  energy: 'maxEnergy',
+  weaponDamage: 'weaponDamage',
+  maxAmmo: 'maxAmmo',
+  attackBonus: 'attackBonusValue',
+  defenseBonus: 'defenseBonusValue',
+  energyPerCell: 'energyPerCell',
+  boltsPerCell: 'boltsPerCell',
+};

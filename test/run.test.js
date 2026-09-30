@@ -6,7 +6,8 @@ globalThis.window = { location: { search: '' } };
 
 const { getGameState } = await import('../state.js');
 const { DIMS } = await import('../config.js');
-const { OBJECT_TYPES, ENEMY_DEFS, getLevelById } = await import('../registry.js');
+const { OBJECT_TYPES, ENEMY_DEFS, getLevelById, PLAYER_DEFS, UPGRADE_DEFS } = await import('../registry.js');
+const BASE_PLAYER = PLAYER_DEFS;
 const { startRun, processPlayerAction, resizeRunVisuals } = await import('../run.js');
 const { processBossTurn } = await import('../bossAI.js');
 const { updateAnimations, isAnimating, clearAnimations } = await import('../animation.js');
@@ -72,17 +73,76 @@ test('attack and defense bonuses can be picked up without exceptions', () => {
   window.location.search = '';
   assert.equal(startRun('test_arena'), true);
   let runState = getGameState().runState;
+  // The picked up value comes from the run's resolved stats, so a stale value on
+  // the cell is ignored. That is what lets the EDGE and WARD upgrades apply.
   setCell(runState, 2, 1, OBJECT_TYPES.ATTACK_BONUS, { value: 3 });
   processPlayerAction(2, 1);
   updateAnimations(300);
-  assert.deepEqual(runState.player.inventory.attackBonuses, [{ value: 3 }]);
+  assert.deepEqual(runState.player.inventory.attackBonuses, [
+    { value: runState.playerStats.attackBonusValue },
+  ]);
 
   assert.equal(startRun('test_arena'), true);
   runState = getGameState().runState;
   setCell(runState, 2, 1, OBJECT_TYPES.DEFENSE_BONUS, { value: 4 });
   processPlayerAction(2, 1);
   updateAnimations(300);
-  assert.deepEqual(runState.player.inventory.defenseBonuses, [{ value: 4 }]);
+  assert.deepEqual(runState.player.inventory.defenseBonuses, [
+    { value: runState.playerStats.defenseBonusValue },
+  ]);
+});
+
+test('upgrades raise the run stats and the values picked up on the floor', () => {
+  window.location.search = '';
+  getGameState().metaState.upgrades = {
+    hp: 4,
+    energy: 3,
+    weaponDamage: 5,
+    maxAmmo: 2,
+    attackBonus: 6,
+    defenseBonus: 3,
+    energyPerCell: 2,
+    boltsPerCell: 4,
+  };
+
+  assert.equal(startRun('dungeon_01'), true);
+  const runState = getGameState().runState;
+  const stats = runState.playerStats;
+
+  assert.equal(stats.maxHp, BASE_PLAYER.hp + 4 * UPGRADE_DEFS.hp.effect);
+  assert.equal(stats.weaponDamage, BASE_PLAYER.weapon.damage + 5 * UPGRADE_DEFS.weaponDamage.effect);
+  assert.equal(runState.player.hp, stats.maxHp);
+  assert.equal(runState.player.maxEnergy, stats.maxEnergy);
+  assert.equal(runState.player.inventory.weapon.damage, stats.weaponDamage);
+  assert.equal(runState.player.inventory.maxAmmo, stats.maxAmmo);
+
+  // An energy cell must grant exactly the resolved per cell amount. Column 1 is
+  // one step from the start, so the move itself is free. Energy starts full, so
+  // spend it first or the pickup would be clipped by the cap.
+  runState.player.energy = 0;
+  setCell(runState, 1, 1, OBJECT_TYPES.ENERGY, null);
+  processPlayerAction(1, 1);
+  updateAnimations(300);
+  assert.equal(
+    runState.player.energy,
+    stats.energyPerCell,
+    'energy granted per cell comes from the resolved stat',
+  );
+
+  getGameState().metaState.upgrades = {};
+});
+
+test('the tutorial always runs the base kit regardless of upgrades', () => {
+  window.location.search = '';
+  getGameState().metaState.upgrades = { hp: 10, weaponDamage: 9 };
+
+  assert.equal(startRun('tutorial'), true);
+  const runState = getGameState().runState;
+
+  assert.equal(runState.player.maxHp, BASE_PLAYER.hp);
+  assert.equal(runState.player.inventory.weapon.damage, BASE_PLAYER.weapon.damage);
+
+  getGameState().metaState.upgrades = {};
 });
 
 test('the same seed produces the same procedural map', () => {

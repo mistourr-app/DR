@@ -1,10 +1,12 @@
 import { AppState } from './config.js';
-import { DATA_VERSION } from './registry.js';
+import { DATA_VERSION, UPGRADE_DEFS, CAMPAIGN_LEVELS, getUpgradeDef, upgradeCost } from './registry.js';
 
 const META_STORAGE_KEY = 'dcc_meta';
 const DATA_VERSION_KEY = 'dcc_data_version';
 const LEVEL_ORDER_KEY = 'levelOrder';
 const LEVEL_VISIBILITY_KEY = 'levelVisibility';
+
+const TOTAL_DUNGEONS = CAMPAIGN_LEVELS.length;
 
 const gameState = {
   appState: AppState.BOOT,
@@ -12,6 +14,10 @@ const gameState = {
   metaState: {
     gold: 0,
     upgrades: {},
+    progress: {
+      current: 1,
+      allUnlocked: false,
+    },
   },
 };
 
@@ -52,14 +58,50 @@ function getStorage() {
   }
 }
 
+// Upgrades are a flat map of key -> purchased level. Anything that is not a
+// known key or a sane non negative integer is dropped, so a hand edited or
+// corrupted save cannot inject stats or prototype keys into the game.
+function normalizeUpgrades(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  const upgrades = {};
+  for (const key of Object.keys(UPGRADE_DEFS)) {
+    // Skip inherited and prototype-polluting keys explicitly.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+
+    const raw = value[key];
+    if (raw === undefined || raw === null) continue;
+
+    const level = Number(raw);
+    if (!Number.isFinite(level) || level < 0) continue;
+
+    upgrades[key] = Math.floor(level);
+  }
+
+  return upgrades;
+}
+
+function normalizeProgress(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const current = Number(source.current);
+
+  return {
+    current: Number.isInteger(current) && current >= 1 && current <= TOTAL_DUNGEONS
+      ? current
+      : 1,
+    // Cheat flag for testing, never granted by normal play.
+    allUnlocked: source.allUnlocked === true,
+  };
+}
+
 function normalizeMetaState(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const gold = Number(source.gold);
+
   return {
     gold: Number.isFinite(gold) && gold >= 0 ? gold : 0,
-    upgrades: source.upgrades && typeof source.upgrades === 'object' && !Array.isArray(source.upgrades)
-      ? source.upgrades
-      : {},
+    upgrades: normalizeUpgrades(source.upgrades),
+    progress: normalizeProgress(source.progress),
   };
 }
 
@@ -110,4 +152,56 @@ export function addGold(amount) {
     gameState.metaState.gold += value;
     saveMetaState();
   }
+}
+
+// Spends gold on one more level of an upgrade. Returns true when the purchase
+// went through; rejects unknown tracks and unaffordable prices.
+export function buyUpgrade(upgradeKey) {
+  // hasOwnProperty lookup: `constructor` and friends must not resolve to a def.
+  if (!getUpgradeDef(upgradeKey)) return false;
+
+  const currentLevel = gameState.metaState.upgrades[upgradeKey] || 0;
+  const cost = upgradeCost(upgradeKey, currentLevel);
+  if (cost === null || !Number.isFinite(cost)) return false;
+  if (gameState.metaState.gold < cost) return false;
+
+  gameState.metaState.gold -= cost;
+  gameState.metaState.upgrades[upgradeKey] = currentLevel + 1;
+  saveMetaState();
+  return true;
+}
+
+export function getUpgradeLevel(upgradeKey) {
+  if (!getUpgradeDef(upgradeKey)) return 0;
+  return gameState.metaState.upgrades[upgradeKey] || 0;
+}
+
+export function getProgress() {
+  return gameState.metaState.progress;
+}
+
+export function setCurrentLevel(level) {
+  const value = Number(level);
+  if (!Number.isInteger(value) || value < 1) return false;
+
+  // Progress never rewinds and never runs past the campaign. Clamping here
+  // rather than relying on the save normaliser keeps memory and storage in sync.
+  const clamped = Math.min(value, TOTAL_DUNGEONS);
+  gameState.metaState.progress.current = Math.max(gameState.metaState.progress.current, clamped);
+  saveMetaState();
+  return true;
+}
+
+// Testing cheat. Lets every dungeon be picked regardless of progress.
+export function setAllLevelsUnlocked(enabled) {
+  gameState.metaState.progress.allUnlocked = enabled === true;
+  saveMetaState();
+  return gameState.metaState.progress.allUnlocked;
+}
+
+// Clears all progress and upgrades, keeping gold. Used by the admin panel.
+export function resetProgress() {
+  gameState.metaState.upgrades = {};
+  gameState.metaState.progress = { current: 1, allUnlocked: false };
+  saveMetaState();
 }

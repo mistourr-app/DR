@@ -34,6 +34,25 @@
       </div>
     </div>
 
+    <div id="cheat-panel" class="mt-6 bg-gray-800 rounded-lg p-6">
+      <h2 class="text-xl font-bold mb-2">🧪 Cheats</h2>
+      <p class="text-gray-400 text-sm mb-4">
+        Campaign progress is stored in localStorage and normally only advances by winning.
+        These shortcuts are for testing; the game never enables them on its own.
+      </p>
+      <div class="flex flex-col gap-3">
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" id="cheat-unlock-all">
+          <span>Unlock every dungeon</span>
+        </label>
+        <div id="cheat-progress" class="text-sm text-gray-400"></div>
+        <div class="flex gap-2">
+          <button id="cheat-gold" class="flex-1 px-4 py-2 bg-yellow-700 hover:bg-yellow-800 rounded text-sm">+1000 gold</button>
+          <button id="cheat-reset-progress" class="flex-1 px-4 py-2 bg-red-800 hover:bg-red-900 rounded text-sm">Reset progress</button>
+        </div>
+      </div>
+    </div>
+
     <div id="create-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
         <h3 class="text-xl font-bold mb-4">Create a new dungeon</h3>
@@ -65,6 +84,34 @@
 
   <script type="module">
     import { LEVELS, validateLevelDefinition } from './registry.js';
+    import { loadMetaState, getGameState, setAllLevelsUnlocked, resetProgress, addGold } from './state.js';
+
+    // Cheats live here because the game itself only ever grants progress.
+    loadMetaState();
+    const cheatPanel = document.getElementById('cheat-panel');
+    if (cheatPanel) {
+      const unlockToggle = document.getElementById('cheat-unlock-all');
+      unlockToggle.checked = getGameState().metaState.progress.allUnlocked === true;
+      unlockToggle.addEventListener('change', () => {
+        setAllLevelsUnlocked(unlockToggle.checked);
+      });
+
+      const progressLabel = document.getElementById('cheat-progress');
+      const renderProgress = () => {
+        progressLabel.textContent = `Current dungeon: ${getGameState().metaState.progress.current} · gold: ${getGameState().metaState.gold}`;
+      };
+      renderProgress();
+
+      document.getElementById('cheat-gold').addEventListener('click', () => {
+        addGold(1000);
+        renderProgress();
+      });
+      document.getElementById('cheat-reset-progress').addEventListener('click', () => {
+        resetProgress();
+        unlockToggle.checked = false;
+        renderProgress();
+      });
+    }
 
     let currentLevels = [...LEVELS];
     let selectedLevel = null;

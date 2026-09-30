@@ -178,6 +178,99 @@
         .overlay .button { background-color: #1f2937; border: 1px solid #374151; padding: 0.75rem 1.5rem; border-radius: 0.5rem; cursor: pointer; margin: 0.5rem; transition: background-color 0.2s; }
         .overlay .button:hover { background-color: #374151; }
         .overlay .button.primary { background-color: #166534; border-color: #16a34a; color: white;}
+        .overlay .button:disabled { background-color: #111827; border-color: #1f2937; color: #4b5563; cursor: not-allowed; }
+
+        /* Upgrade screen: a scrollable grid of cards pinned between a gold
+           header and the enter button. */
+        .overlay.upgrade-screen {
+            background-color: rgba(9, 10, 12, 1);
+            justify-content: flex-start;
+            padding: 3vh 16px 2vh 16px;
+        }
+        .upgrade-header {
+            flex: 0 0 auto;
+            width: 100%;
+            max-width: 640px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 2vh;
+        }
+        .upgrade-header h2 { margin-bottom: 0; font-size: 1.4rem; }
+        .upgrade-gold { color: #FFE761; font-weight: 900; font-size: 1.1rem; white-space: nowrap; }
+        .upgrade-grid {
+            flex: 1 1 auto;
+            width: 100%;
+            max-width: 640px;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            touch-action: pan-y;
+            -webkit-overflow-scrolling: touch;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            text-align: left;
+        }
+        .upgrade-card {
+            background-color: #15171e;
+            border: 1px solid #2d313d;
+            border-radius: 0.5rem;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .upgrade-card.unaffordable { opacity: 0.55; }
+        .upgrade-card-name {
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #94a3b8;
+        }
+        .upgrade-card-value { font-size: 1.05rem; font-weight: 900; color: #e5e7eb; }
+        .upgrade-card-value .next { color: #16a34a; }
+        .upgrade-card-level { font-size: 0.65rem; color: #6b7280; }
+        .upgrade-card-buy {
+            margin: 2px 0 0 0;
+            padding: 0.35rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 800;
+            background-color: #166534;
+            border: 1px solid #16a34a;
+            color: white;
+            border-radius: 0.35rem;
+            cursor: pointer;
+        }
+        .upgrade-card-buy:disabled { background-color: #111827; border-color: #1f2937; color: #4b5563; cursor: not-allowed; }
+        .upgrade-footer { flex: 0 0 auto; margin-top: 2vh; }
+        .upgrade-footer .button { margin: 0; }
+
+        /* Level select states: only the current dungeon is playable. */
+        .level-btn.locked {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: #1f2937;
+        }
+        .level-btn.current {
+            border-color: #16a34a;
+            color: #86efac;
+            box-shadow: 0 0 0 1px #16a34a;
+        }
+        .level-btn .level-tag { font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
+        .level-btn.current .level-tag { color: #16a34a; }
+        .link-button {
+            background: none;
+            border: none;
+            color: #6b7280;
+            font-size: 0.8rem;
+            text-decoration: underline;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+        .link-button:hover { color: #e5e7eb; }
         .ui-button {
             background-color: rgba(31, 41, 55, 0.7);
             border: 1px solid #374151;
@@ -275,21 +368,36 @@
     </div>
 
     <div id="victory-screen" class="overlay" style="display: none;">
-        <h2>DUNGEON CLEARED</h2>
-        <p>You reached the end. Well fought!</p>
+        <div class="overlay-content">
+            <h2 id="victory-title">DUNGEON COMPLETED</h2>
+            <p id="victory-message">You reached the end. Well fought!</p>
+            <p id="victory-gold"></p>
+        </div>
         <div>
-            <button id="victory-to-menu-btn" class="button primary">DUNGEON SELECT</button>
+            <button id="victory-continue-btn" class="button primary">CONTINUE</button>
+        </div>
+    </div>
+
+    <div id="upgrade-screen" class="overlay upgrade-screen" style="display: none;">
+        <div class="upgrade-header">
+            <h2 id="upgrade-title">SPEND YOUR GOLD</h2>
+            <span class="upgrade-gold" id="upgrade-gold">0 GOLD</span>
+        </div>
+        <div class="upgrade-grid" id="upgrade-grid"></div>
+        <div class="upgrade-footer">
+            <button id="upgrade-enter-btn" class="button primary w-full">ENTER DUNGEON</button>
         </div>
     </div>
 
     <div id="game-over-screen" class="overlay death-screen" style="display: none; opacity: 0; transition: opacity 0.5s ease-in;">
         <div class="overlay-content">
-            <h2 id="game-over-title">YOUR LIGHT FADES</h2>
-            <p id="game-over-message">Your vitality drained to nothing</p>
+            <h2 id="game-over-title">DUNGEON</h2>
+            <p id="game-over-message">You are dead.</p>
         </div>
         <div class="overlay-buttons flex flex-col gap-2 w-full max-w-sm">
             <button id="restart-level-btn" class="button primary w-full">TRY AGAIN</button>
-            <button id="game-over-to-menu-btn" class="button w-full">DUNGEON SELECT</button>
+            <button id="game-over-upgrade-btn" class="button w-full">SPEND GOLD</button>
+            <button id="game-over-exit-btn" class="link-button">EXIT TO DUNGEON SELECT</button>
         </div>
     </div>
 

@@ -144,9 +144,59 @@ export const BALANCE = {
     },
     "GOLD": {
       "label": "GOLD",
-      "value": "+5",
-      "amount": 5,
+      "value": "+10",
+      "amount": 10,
       "color": "#FFE761"
+    }
+  },
+  "upgrades": {
+    "hp": {
+      "label": "MIGHT",
+      "effect": 5,
+      "base": 20,
+      "step": 10
+    },
+    "energy": {
+      "label": "VIGOUR",
+      "effect": 2,
+      "base": 15,
+      "step": 8
+    },
+    "weaponDamage": {
+      "label": "BOLT POWER",
+      "effect": 1,
+      "base": 25,
+      "step": 12
+    },
+    "maxAmmo": {
+      "label": "QUIVER",
+      "effect": 1,
+      "base": 30,
+      "step": 15
+    },
+    "attackBonus": {
+      "label": "EDGE",
+      "effect": 1,
+      "base": 18,
+      "step": 9
+    },
+    "defenseBonus": {
+      "label": "WARD",
+      "effect": 1,
+      "base": 18,
+      "step": 9
+    },
+    "energyPerCell": {
+      "label": "SIPHON",
+      "effect": 2,
+      "base": 20,
+      "step": 10
+    },
+    "boltsPerCell": {
+      "label": "SALVAGE",
+      "effect": 1,
+      "base": 22,
+      "step": 11
     }
   }
 };

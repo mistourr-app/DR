@@ -112,6 +112,58 @@ cells.ATTACK_CELL.label,ATTACK,
 cells.ATTACK_CELL.value,10,damage of an arena attack cell
 cells.ATTACK_CELL.color,#C40014,
 cells.GOLD.label,GOLD,
-cells.GOLD.value,+5,drawn on the cell
-cells.GOLD.amount,5,gold added
+cells.GOLD.value,+10,drawn on the cell
+cells.GOLD.amount,10,gold added
 cells.GOLD.color,#FFE761,
+
+# --- Player upgrades ---------------------------------------------------------
+# Bought with gold between runs. Levels are unlimited.
+#
+#   price of the next level = base + step * currentLevel
+#
+# effect is added once per purchased level. The key decides what it feeds:
+#
+#   hp             run max hp; melee damage equals hp, so this doubles as might
+#   energy         run max energy
+#   weaponDamage   crossbow damage
+#   maxAmmo        crossbow bolts per run
+#   attackBonus    value of each attack stack; slot count stays fixed at 2
+#   defenseBonus   value of each defense stack; slot count stays fixed at 2
+#   energyPerCell  energy granted per energy cell
+#   boltsPerCell   bolts granted per bolt cell
+#
+# Economy: a perfect clear of the whole campaign yields roughly 2200 gold and a
+# viable end game build costs roughly 1500, so the player is always short but
+# can finish. Tweak the curve here, never in code.
+upgrades.hp.label,MIGHT,also the melee damage stat
+upgrades.hp.effect,5,added to max hp per level
+upgrades.hp.base,20,price of the first level
+upgrades.hp.step,10,price growth per level
+upgrades.energy.label,VIGOUR,
+upgrades.energy.effect,2,added to max energy per level
+upgrades.energy.base,15,price of the first level
+upgrades.energy.step,8,price growth per level
+upgrades.weaponDamage.label,BOLT POWER,
+upgrades.weaponDamage.effect,1,added to crossbow damage per level
+upgrades.weaponDamage.base,25,price of the first level
+upgrades.weaponDamage.step,12,price growth per level
+upgrades.maxAmmo.label,QUIVER,
+upgrades.maxAmmo.effect,1,added to max bolts per level
+upgrades.maxAmmo.base,30,price of the first level
+upgrades.maxAmmo.step,15,price growth per level
+upgrades.attackBonus.label,EDGE,
+upgrades.attackBonus.effect,1,added to each attack stack per level
+upgrades.attackBonus.base,18,price of the first level
+upgrades.attackBonus.step,9,price growth per level
+upgrades.defenseBonus.label,WARD,
+upgrades.defenseBonus.effect,1,added to each defense stack per level
+upgrades.defenseBonus.base,18,price of the first level
+upgrades.defenseBonus.step,9,price growth per level
+upgrades.energyPerCell.label,SIPHON,
+upgrades.energyPerCell.effect,2,added to energy per energy cell
+upgrades.energyPerCell.base,20,price of the first level
+upgrades.energyPerCell.step,10,price growth per level
+upgrades.boltsPerCell.label,SALVAGE,
+upgrades.boltsPerCell.effect,1,added to bolts per bolt cell
+upgrades.boltsPerCell.base,22,price of the first level
+upgrades.boltsPerCell.step,11,price growth per level

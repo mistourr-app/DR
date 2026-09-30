@@ -15,4 +15,5 @@ export const AppState = {
   RUN_PLAYING: 'RUN_PLAYING',
   RUN_SUMMARY: 'RUN_SUMMARY',
   RUN_VICTORY: 'RUN_VICTORY',
+  UPGRADE: 'UPGRADE',
 };

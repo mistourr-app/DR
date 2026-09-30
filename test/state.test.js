@@ -21,22 +21,64 @@ const { validateLevelDefinition, getLevelById } = await import('../registry.js')
 const TUTORIAL_LEVEL = getLevelById('tutorial');
 const CAMPAIGN_LEVEL = getLevelById('dungeon_01');
 
+function defaultMeta() {
+  return { gold: 0, upgrades: {}, progress: { current: 1, allUnlocked: false } };
+}
+
 test('malformed metadata falls back and valid gold is persisted', () => {
   storage.set('dcc_data_version', '2');
   storage.set('dcc_meta', JSON.stringify({ gold: 'not-a-number', upgrades: [] }));
   loadMetaState();
-  assert.deepEqual(getGameState().metaState, { gold: 0, upgrades: {} });
+  assert.deepEqual(getGameState().metaState, defaultMeta());
 
-  storage.set('dcc_meta', JSON.stringify({ gold: 7, upgrades: { damage: 1 } }));
+  // Unknown upgrade keys are dropped instead of surviving into the game.
+  storage.set('dcc_meta', JSON.stringify({ gold: 7, upgrades: { damage: 1, hp: 2 } }));
   loadMetaState();
   addGold(3);
 
   assert.equal(getGameState().metaState.gold, 10);
-  assert.deepEqual(JSON.parse(storage.get('dcc_meta')), { gold: 10, upgrades: { damage: 1 } });
+  assert.deepEqual(JSON.parse(storage.get('dcc_meta')), {
+    gold: 10,
+    upgrades: { hp: 2 },
+    progress: { current: 1, allUnlocked: false },
+  });
 
   storage.set('dcc_meta', '{bad');
   assert.doesNotThrow(() => loadMetaState());
-  assert.deepEqual(getGameState().metaState, { gold: 0, upgrades: {} });
+  assert.deepEqual(getGameState().metaState, defaultMeta());
+});
+
+test('upgrade levels are clamped and hostile keys are refused', () => {
+  storage.set('dcc_meta', JSON.stringify({
+    gold: 0,
+    upgrades: {
+      hp: 3.9,
+      energy: -5,
+      weaponDamage: '4',
+      maxAmmo: 'lots',
+      __proto__: { polluted: true },
+      constructor: 1,
+      nonsense: 12,
+    },
+    progress: { current: 999, allUnlocked: 'yes' },
+  }));
+  loadMetaState();
+
+  const { upgrades, progress } = getGameState().metaState;
+
+  // Floored, negatives dropped, unknown keys gone, prototype keys gone.
+  assert.equal(upgrades.hp, 3);
+  assert.equal('energy' in upgrades, false);
+  assert.equal(upgrades.weaponDamage, 4);
+  assert.equal('maxAmmo' in upgrades, false);
+  assert.equal('nonsense' in upgrades, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(upgrades, '__proto__'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(upgrades, 'constructor'), false);
+  assert.equal({}.polluted, undefined, 'prototype must not be polluted');
+
+  // Out of range progress falls back, and the cheat flag must be a real boolean.
+  assert.equal(progress.current, 1);
+  assert.equal(progress.allUnlocked, false);
 });
 
 test('level validation rejects impossible definitions', () => {

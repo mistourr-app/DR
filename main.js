@@ -1,7 +1,7 @@
 import { AppState, DIMS } from './config.js';
-import { getLevelById } from './registry.js';
-import { getGameState, setAppState, loadMetaState, addGold } from './state.js';
-import { showLevelSelectScreen, hideAllScreens, showGameOverScreen, showVictoryScreen, renderUi, renderTopBar, resetTopBar, updateGoldCounter } from './ui.js';
+import { getLevelById, CAMPAIGN_LEVELS } from './registry.js';
+import { getGameState, setAppState, loadMetaState, addGold, setCurrentLevel } from './state.js';
+import { showLevelSelectScreen, hideAllScreens, showGameOverScreen, showVictoryScreen, showUpgradeScreen, renderUi, renderTopBar, resetTopBar, updateGoldCounter } from './ui.js';
 import { startRun, processPlayerAction, initRun, getDeathType, resizeRunVisuals } from './run.js';
 import { initRenderer, renderRun } from './renderer.js';
 import { updateAnimations, isAnimating, clearAnimations } from './animation.js';
@@ -43,6 +43,48 @@ function resize() {
 }
 
 /**
+ * Commits the gold of a finished run exactly once.
+ * @returns {number} The amount that was banked.
+ */
+function commitRunGold() {
+  const { runState } = getGameState();
+  if (!runState || runState.goldCommitted) return 0;
+
+  const goldCollected = runState.goldCollected || 0;
+  if (goldCollected > 0) addGold(goldCollected);
+  runState.goldCommitted = true;
+  return goldCollected;
+}
+
+// Drops the deep link parameters so a restart cannot replay a pinned seed.
+function clearRunUrl() {
+  const url = new URL(window.location);
+  url.searchParams.delete('seed');
+  url.searchParams.delete('level');
+  window.history.pushState({}, '', url);
+}
+
+function goToMenu() {
+  clearAnimations();
+  stopTutorial();
+  clearRunUrl();
+  setAppState(AppState.META_HUB, onStateChange);
+}
+
+// The dungeon id that follows the one just finished, or null at the end of the
+// campaign and for levels that are not part of it.
+function nextCampaignLevelId() {
+  const { runState, metaState } = getGameState();
+  const finished = getLevelById(runState?.levelId);
+  if (!finished || !Number.isInteger(finished.difficulty)) return null;
+
+  const next = finished.difficulty + 1;
+  if (next > CAMPAIGN_LEVELS.length) return null;
+
+  return `dungeon_${String(next).padStart(2, '0')}`;
+}
+
+/**
  * Called whenever the application state changes.
  * Responsible for setting up the UI for the new state.
  */
@@ -59,56 +101,71 @@ function onStateChange(newState, oldState) {
         }
       });
       break;
+
+    case AppState.UPGRADE: {
+      const nextLevelId = nextCampaignLevelId();
+      showUpgradeScreen(() => {
+        if (nextLevelId && startRun(nextLevelId)) {
+          setAppState(AppState.RUN_PLAYING, onStateChange);
+        } else {
+          goToMenu();
+        }
+      }, nextLevelId ? 'ENTER DUNGEON' : 'BACK TO DUNGEON SELECT');
+      break;
+    }
+
     case AppState.RUN_SUMMARY: {
-      const state = getGameState();
-      const lastRunLevelId = state.runState?.levelId;
-      const goldCollected = state.runState?.goldCollected || 0;
+      const { runState } = getGameState();
+      const lastRunLevelId = runState?.levelId;
+      const level = getLevelById(lastRunLevelId);
+      const levelName = level?.name || 'DUNGEON';
+      const isTutorial = level?.isTutorial === true;
+      commitRunGold();
 
-      // Persist gold on death
-      if (goldCollected > 0) {
-        addGold(goldCollected);
-      }
-      if (state.runState) state.runState.goldCommitted = true;
+      // The tutorial teaches the base kit, so it never leads into the upgrade
+      // screen; it drops straight back into the level select.
+      const goUpgrades = () => {
+        if (isTutorial) goToMenu();
+        else setAppState(AppState.UPGRADE, onStateChange);
+      };
 
-      const deathType = getDeathType();
       showGameOverScreen(
         () => { // onRestart
           if (lastRunLevelId && startRun(lastRunLevelId)) {
             setAppState(AppState.RUN_PLAYING, onStateChange);
           }
         },
-        () => { // onGoToMenu
-          clearAnimations();
-          stopTutorial();
-         const url = new URL(window.location);
-         url.searchParams.delete('seed');
-         url.searchParams.delete('level');
-         window.history.pushState({}, '', url);
-          setAppState(AppState.META_HUB, onStateChange);
-        },
-        deathType
+        goUpgrades,
+        goToMenu,
+        levelName,
+        getDeathType(),
       );
       break;
     }
+
     case AppState.RUN_VICTORY: {
-      const state = getGameState();
-      const goldCollected = state.runState?.goldCollected || 0;
+      const { runState } = getGameState();
+      const levelId = runState?.levelId;
+      const level = getLevelById(levelId);
+      const levelName = level?.name || 'DUNGEON';
+      const goldEarned = commitRunGold();
 
-      // Persist gold on victory
-      if (goldCollected > 0) {
-        addGold(goldCollected);
+      // Clearing a campaign dungeon opens the next one.
+      if (Number.isInteger(level?.difficulty)) {
+        setCurrentLevel(level.difficulty + 1);
       }
-      if (state.runState) state.runState.goldCommitted = true;
 
-      showVictoryScreen(() => { // onGoToMenu
-        clearAnimations();
-        stopTutorial();
-        const url = new URL(window.location);
-        url.searchParams.delete('seed');
-        url.searchParams.delete('level');
-        window.history.pushState({}, '', url);
-        setAppState(AppState.META_HUB, onStateChange);
-      });
+      // The tutorial goes straight back to the level select.
+      if (level?.isTutorial) {
+        goToMenu();
+        break;
+      }
+
+      showVictoryScreen(
+        () => setAppState(AppState.UPGRADE, onStateChange),
+        levelName,
+        goldEarned,
+      );
       break;
     }
   }
@@ -145,16 +202,7 @@ function render(deltaTime = 1000 / 60) {
 
   switch (state.appState) {
     case AppState.RUN_PLAYING:
-      renderTopBar(state.runState, () => {
-        clearAnimations();
-        // Stop the tutorial when returning to the menu
-        stopTutorial();
-        const url = new URL(window.location);
-        url.searchParams.delete('seed');
-           url.searchParams.delete('level');
-        window.history.pushState({}, '', url);
-        setAppState(AppState.META_HUB, onStateChange);
-      });
+      renderTopBar(state.runState, goToMenu);
       renderRun(deltaTime);
       renderUi(state.runState);
       break;

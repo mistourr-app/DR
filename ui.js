@@ -1,5 +1,5 @@
-import { LEVELS, CELL_DEFS, OBJECT_TYPES } from './registry.js';
-import { getGameState } from './state.js';
+import { LEVELS, CELL_DEFS, OBJECT_TYPES, UPGRADE_DEFS, UPGRADE_KEY_TO_STAT, upgradeCost, resolvePlayerStats } from './registry.js';
+import { getGameState, buyUpgrade } from './state.js';
 import { scheduleRunCallback } from './animation.js';
 import { getAssetDefinition, getAssetUrl } from './assets/loader.js';
 
@@ -66,6 +66,7 @@ function applyAssetBackground(element, assetId) {
 // Grab references to every overlay once
 const levelSelectScreen = document.getElementById('level-select-screen');
 const victoryScreen = document.getElementById('victory-screen');
+const upgradeScreen = document.getElementById('upgrade-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
 const levelEditorScreen = document.getElementById('level-editor-screen');
 const createLevelScreen = document.getElementById('create-level-screen');
@@ -75,6 +76,7 @@ const inventoryDisplay = document.getElementById('inventory-display');
 const allScreens = [
   levelSelectScreen,
   victoryScreen,
+  upgradeScreen,
   gameOverScreen,
   levelEditorScreen,
   createLevelScreen
@@ -138,16 +140,35 @@ export function showLevelSelectScreen(onLevelSelect) {
     container.innerHTML = '';
     // Hidden levels are skipped. The list is reversed: the last level on top, the first at the bottom.
     const visibleLevels = orderedLevels.filter(level => !level.hidden).reverse();
+    const { progress } = getGameState().metaState;
+
     visibleLevels.forEach(level => {
+      // Only the current dungeon is playable. Cleared ones stay visible but are
+      // locked, and the testing cheat lifts the gate entirely.
+      const isCurrent = level.difficulty === progress.current;
+      const locked = !progress.allUnlocked && Number.isInteger(level.difficulty) && !isCurrent;
+
       const button = document.createElement('button');
       button.id = `level-btn-${level.id}`;
-      button.innerText = `${level.name} (${level.rows} ROWS)`;
-      button.className = 'button';
-      button.addEventListener('click', () => onLevelSelect(level.id));
+      button.className = `button level-btn${locked ? ' locked' : ''}${isCurrent ? ' current' : ''}`;
+      button.disabled = locked;
+
+      const rows = `${level.rows} ROWS`;
+      const tag = level.isTutorial ? 'TUTORIAL' : (isCurrent ? 'CURRENT' : (locked ? 'LOCKED' : ''));
+      button.innerHTML = `${escapeHtml(level.name)} <span class="level-tag">${escapeHtml(tag)}</span><br><span class="level-tag">${escapeHtml(rows)}</span>`;
+
+      if (!locked) button.addEventListener('click', () => onLevelSelect(level.id));
       container.appendChild(button);
     });
-    // The tutorial sits at the bottom of the list, so open the menu right on it.
-    container.scrollTop = container.scrollHeight;
+
+    // The current dungeon must always be in view: the list is reversed, so it
+    // sits somewhere in the middle once the player gets past the tutorial.
+    const currentButton = container.querySelector('.level-btn.current');
+    if (currentButton) {
+      currentButton.scrollIntoView({ block: 'center' });
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
   }
 }
 
@@ -286,63 +307,138 @@ export function renderUi(runState) {
 }
 
 /**
+ * Rebinds a static button so repeated runs never stack listeners.
+ * @param {string} id - Element id of the button.
+ * @param {function(): void} handler - Click handler.
+ */
+function bindButton(id, handler) {
+  const button = document.getElementById(id);
+  if (!button) return;
+
+  const fresh = button.cloneNode(true);
+  fresh.addEventListener('click', handler);
+  button.parentNode.replaceChild(fresh, button);
+}
+
+/**
  * Shows the defeat screen.
- * @param {function(): void} onRestart - Callback for the "TRY AGAIN" button.
- * @param {function(): void} onGoToMenu - Callback for the "DUNGEON SELECT" button.
+ * @param {function(): void} onRestart - Callback for "TRY AGAIN".
+ * @param {function(): void} onUpgrade - Callback for "SPEND GOLD".
+ * @param {function(): void} onGoToMenu - Callback for the exit link.
+ * @param {string} levelName - Name of the dungeon that was lost.
  * @param {string} deathType - Cause of death: 'damage' or 'exhaustion'
  */
-export function showGameOverScreen(onRestart, onGoToMenu, deathType = 'damage') {
-  if (gameOverScreen) {
-    applyAssetBackground(gameOverScreen, 'ui.screen.defeat');
-    // Set the text depending on the cause of death
-    const titleEl = document.getElementById('game-over-title');
-    const messageEl = document.getElementById('game-over-message');
-    
-    if (deathType === 'exhaustion') {
-      titleEl.textContent = 'EXHAUSTED';
-      messageEl.innerHTML = 'You pushed on with nothing left to spend.<br>Watch your energy reserves!';
-    } else {
-      titleEl.textContent = 'YOUR LIGHT FADES';
-      messageEl.textContent = 'Your vitality drained to nothing';
-    }
-    
-    // Reveal it after a delay
-    gameOverScreen.style.display = 'flex';
-    gameOverScreen.style.opacity = '0';
-    
-    scheduleRunCallback(800, () => {
-      gameOverScreen.style.opacity = '1';
-    });
+export function showGameOverScreen(onRestart, onUpgrade, onGoToMenu, levelName = 'DUNGEON', deathType = 'damage') {
+  if (!gameOverScreen) return;
 
-    // Reuse the cloneNode approach so the callbacks are always fresh
-    const restartBtn = document.getElementById('restart-level-btn');
-    const toMenuBtn = document.getElementById('game-over-to-menu-btn');
+  applyAssetBackground(gameOverScreen, 'ui.screen.defeat');
 
-    const newRestartBtn = restartBtn.cloneNode(true);
-    newRestartBtn.addEventListener('click', onRestart);
-    restartBtn.parentNode.replaceChild(newRestartBtn, restartBtn);
+  const titleEl = document.getElementById('game-over-title');
+  const messageEl = document.getElementById('game-over-message');
 
-    const newToMenuBtn = toMenuBtn.cloneNode(true);
-    newToMenuBtn.addEventListener('click', onGoToMenu);
-    toMenuBtn.parentNode.replaceChild(newToMenuBtn, toMenuBtn);
-  }
+  titleEl.textContent = levelName;
+  messageEl.textContent = deathType === 'exhaustion'
+    ? 'You are dead. You ran out of energy.'
+    : 'You are dead.';
+
+  // Reveal it after a delay
+  gameOverScreen.style.display = 'flex';
+  gameOverScreen.style.opacity = '0';
+
+  scheduleRunCallback(800, () => {
+    gameOverScreen.style.opacity = '1';
+  });
+
+  bindButton('restart-level-btn', onRestart);
+  bindButton('game-over-upgrade-btn', onUpgrade);
+  bindButton('game-over-exit-btn', onGoToMenu);
 }
 
 /**
  * Shows the victory screen.
- * @param {function(): void} onGoToMenu - Callback for the "DUNGEON SELECT" button.
+ * @param {function(): void} onContinue - Callback for "CONTINUE".
+ * @param {string} levelName - Name of the dungeon that was cleared.
+ * @param {number} goldEarned - Gold collected during the run.
  */
-export function showVictoryScreen(onGoToMenu) {
-  if (victoryScreen) {
-    applyAssetBackground(victoryScreen, 'ui.screen.victory');
-    victoryScreen.style.display = 'flex';
+export function showVictoryScreen(onContinue, levelName = 'DUNGEON', goldEarned = 0) {
+  if (!victoryScreen) return;
 
-    const toMenuBtn = document.getElementById('victory-to-menu-btn');
-    if (toMenuBtn) {
-      const newToMenuBtn = toMenuBtn.cloneNode(true);
+  applyAssetBackground(victoryScreen, 'ui.screen.victory');
 
-      toMenuBtn.parentNode.replaceChild(newToMenuBtn, toMenuBtn);
-      newToMenuBtn.addEventListener('click', onGoToMenu);
+  document.getElementById('victory-title').textContent = `${levelName} COMPLETED`;
+  document.getElementById('victory-message').textContent = 'You reached the end. Well fought.';
+  document.getElementById('victory-gold').textContent = `+${goldEarned} GOLD`;
+
+  victoryScreen.style.display = 'flex';
+  bindButton('victory-continue-btn', onContinue);
+}
+
+// Label of the stat each upgrade track feeds, for the card readout.
+const UPGRADE_STAT_LABELS = {
+  maxHp: 'HP',
+  maxEnergy: 'ENERGY',
+  weaponDamage: 'DAMAGE',
+  maxAmmo: 'BOLTS',
+  attackBonusValue: 'ATTACK',
+  defenseBonusValue: 'SHIELD',
+  energyPerCell: 'ENERGY / CELL',
+  boltsPerCell: 'BOLTS / CELL',
+};
+
+function buildUpgradeCards() {
+  const { metaState } = getGameState();
+  const stats = resolvePlayerStats(metaState.upgrades);
+
+  return Object.entries(UPGRADE_DEFS).map(([key, def]) => {
+    const level = metaState.upgrades[key] || 0;
+    const cost = upgradeCost(key, level);
+    const statKey = UPGRADE_KEY_TO_STAT[key];
+    const current = statKey ? stats[statKey] : 0;
+    const next = current + def.effect;
+    const label = statKey ? ` ${UPGRADE_STAT_LABELS[statKey]}` : '';
+    const affordable = metaState.gold >= cost;
+
+    return `
+      <div class="upgrade-card${affordable ? '' : ' unaffordable'}">
+        <span class="upgrade-card-name">${escapeHtml(def.label)}</span>
+        <span class="upgrade-card-value">${escapeHtml(String(current))}${escapeHtml(label)} <span class="next">&rarr; ${escapeHtml(String(next))}</span></span>
+        <span class="upgrade-card-level">LV ${level}</span>
+        <button class="upgrade-card-buy" data-upgrade="${escapeHtml(key)}"${affordable ? '' : ' disabled'}>${escapeHtml(String(cost))} G</button>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Shows the upgrade screen.
+ * @param {function(): void} onEnter - Callback for the footer button.
+ * @param {string} [enterLabel] - Footer button caption.
+ */
+export function showUpgradeScreen(onEnter, enterLabel = 'ENTER DUNGEON') {
+  if (!upgradeScreen) return;
+
+  applyAssetBackground(upgradeScreen, 'ui.screen.victory');
+
+  const { metaState } = getGameState();
+  document.getElementById('upgrade-gold').textContent = `${metaState.gold} GOLD`;
+
+  const grid = document.getElementById('upgrade-grid');
+  grid.innerHTML = buildUpgradeCards();
+
+  // Delegation: the grid is rebuilt on every purchase, so per button listeners
+  // would be thrown away anyway.
+  grid.onclick = (event) => {
+    const button = event.target.closest('[data-upgrade]');
+    if (!button || button.disabled) return;
+    if (buyUpgrade(button.dataset.upgrade)) {
+      document.getElementById('upgrade-gold').textContent = `${getGameState().metaState.gold} GOLD`;
+      grid.innerHTML = buildUpgradeCards();
     }
-  }
+  };
+
+  const enterButton = document.getElementById('upgrade-enter-btn');
+  enterButton.textContent = enterLabel;
+  bindButton('upgrade-enter-btn', onEnter);
+
+  upgradeScreen.style.display = 'flex';
 }

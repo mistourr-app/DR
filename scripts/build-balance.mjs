@@ -191,6 +191,43 @@ export function validateBalance(data) {
   const spawnBudget = Object.values(chances).reduce((sum, range) => sum + range.to, 0);
   if (spawnBudget > 1.000001) errors.push(`chances at the last dungeon sum to ${spawnBudget}, the budget is 1`);
 
+  if (!(data.cells?.GOLD?.amount > 0)) errors.push('cells.GOLD.amount must be positive');
+
+  const upgradeKeys = Object.keys(data.upgrades || {});
+  if (upgradeKeys.length === 0) errors.push('no player upgrades defined');
+
+  upgradeKeys.forEach((key) => {
+    const def = data.upgrades[key];
+
+    if (!def.label) errors.push(`upgrades.${key}.label is missing`);
+
+    ['effect', 'base', 'step'].forEach((field) => {
+      if (typeof def[field] !== 'number' || !Number.isFinite(def[field])) {
+        errors.push(`upgrades.${key}.${field} must be a finite number, got ${JSON.stringify(def[field])}`);
+      }
+    });
+
+    if (def.effect <= 0) errors.push(`upgrades.${key}.effect must be positive`);
+    if (def.base < 0) errors.push(`upgrades.${key}.base cannot be negative`);
+    if (def.step < 0) errors.push(`upgrades.${key}.step cannot be negative`);
+
+    // A track whose first level is free or negative is dead on arrival.
+    if (def.base <= 0 && def.step <= 0) {
+      errors.push(`upgrades.${key} can never be bought: first level would cost ${def.base}`);
+    }
+  });
+
+  // Sanity check the economy: an untouched player has to be able to afford the
+  // cheapest track within the first dungeon, otherwise nothing opens up.
+  const cheapestFirst = Math.min(...upgradeKeys.map(key => data.upgrades[key].base));
+  const goldPerCell = data.cells?.GOLD?.amount;
+  const firstDungeonCells = ((data.campaign?.rows?.from ?? 0) - 3) * 5;
+  const firstDungeonGold = firstDungeonCells * (chances.GOLD?.to ?? 0) * (goldPerCell ?? 0);
+
+  if (upgradeKeys.length > 0 && cheapestFirst > firstDungeonGold) {
+    errors.push(`cheapest upgrade costs ${cheapestFirst} but dungeon 1 yields about ${Math.round(firstDungeonGold)}`);
+  }
+
   return errors;
 }
 
