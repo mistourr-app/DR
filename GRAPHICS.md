@@ -177,6 +177,10 @@ Player/Arena
 
 ### Enemies
 
+Имена типов в реестре — `TYPE_1` ARCANIST, `TYPE_2` SPEARMAN, `TYPE_3` WARDEN.
+Id ассетов строятся из ключа: `TYPE_N` → `enemy.type-N.*` (`renderer.js:30`),
+поэтому переименование врага не ломает графику.
+
 ```text
 Enemy/TYPE_1/Idle
 Enemy/TYPE_1/Alert
@@ -189,7 +193,18 @@ Enemy/TYPE_2/Alert
 Enemy/TYPE_2/Attack
 Enemy/TYPE_2/Damaged
 Enemy/TYPE_2/Death
+
+Enemy/TYPE_3/Idle
+Enemy/TYPE_3/Alert
+Enemy/TYPE_3/Attack
+Enemy/TYPE_3/Damaged
+Enemy/TYPE_3/Death
 ```
+
+Для `TYPE_3` в `assets/manifest.json` уже заведены пять записей
+`enemy.type-3.*` со всеми состояниями, но они с `"enabled": false` и без
+файлов — включать пока нечего, рендер идёт процедурным фолбэком, как и у всех
+врагов.
 
 ### Bosses
 

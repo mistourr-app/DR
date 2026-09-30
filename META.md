@@ -646,9 +646,10 @@ export function upgradeEquipment(equipmentId) {
 ## 9. Баланс (черновик)
 
 ### 9.1 Награды за действия
-- Убийство врага TYPE_1: 10 gold
-- Убийство врага TYPE_2: 15 gold
-- Победа над боссом: 100 gold + 5 crystals
+- Убийство врага TYPE_1 (ARCANIST): 10 gold
+- Убийство врага TYPE_2 (SPEARMAN): 15 gold
+- Убийство врага TYPE_3 (WARDEN): 25 gold
+- Победа над боссом (ELDER): 100 gold + 5 crystals
 - Прохождение уровня: 50 gold
 
 ### 9.2 Стоимость прокачек
