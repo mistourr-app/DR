@@ -73,6 +73,35 @@ enemies.TYPE_3.actionRange,1,declared intent, not read at runtime
 enemies.TYPE_3.color,#FF1F1F,
 enemies.TYPE_3.weight,1,relative spawn weight, normalised at load
 
+# --- Elder arena spawns ------------------------------------------------------
+# The Elder hall is the last two rows of a level. Bolts and energy only ever
+# appear on the player's own row, and the row is never allowed to run empty of
+# either: supply is forced when a row drops below the floor below. Without that
+# floor a roll of a few percent left three quarters of all fights starting with
+# no bolts and no energy at all.
+#
+# hpLow applies while hp fraction is under hpLowThreshold, hpHigh while it is
+# over hpHighThreshold, base in between. Values are relative and normalised, so
+# they do not have to sum to 1.
+arena.hpLowThreshold,0.5,
+arena.hpHighThreshold,0.75,
+arena.supply.ammo,1,bolt cells guaranteed on the player row
+arena.supply.energy,1,energy cells guaranteed on the player row
+arena.chances.ATTACK_CELL.base,0.20,
+arena.chances.ATTACK_CELL.hpLow,0.10,
+arena.chances.ATTACK_CELL.hpHigh,0.30,
+arena.chances.ATTACK_BONUS.base,0.20,
+arena.chances.ATTACK_BONUS.hpHigh,0.25,
+arena.chances.DEFENSE_BONUS.base,0.20,
+arena.chances.DEFENSE_BONUS.hpLow,0.25,
+arena.chances.HEAL.base,0.25,
+arena.chances.HEAL.hpLow,0.35,
+arena.chances.HEAL.hpHigh,0.15,
+arena.chances.AMMO.playerRow,0.12,player row only, never on the elder row
+arena.chances.ENERGY.playerRow,0.14,player row only, never on the elder row
+arena.attackCellDamage.min,5,
+arena.attackCellDamage.max,10,
+
 # --- Player -----------------------------------------------------------------
 # Flat for the whole campaign, meta upgrades are not wired up yet.
 # Elder hp is derived from hp times bossHpMultiplier, it has no own field.

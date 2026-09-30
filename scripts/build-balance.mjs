@@ -228,6 +228,56 @@ export function validateBalance(data) {
     errors.push(`cheapest upgrade costs ${cheapestFirst} but dungeon 1 yields about ${Math.round(firstDungeonGold)}`);
   }
 
+  const arena = data.arena;
+  if (!arena) {
+    errors.push('arena is missing');
+    return errors;
+  }
+
+  ['hpLowThreshold', 'hpHighThreshold'].forEach((field) => {
+    if (typeof arena[field] !== 'number' || !Number.isFinite(arena[field])) {
+      errors.push(`arena.${field} must be a finite number`);
+    }
+  });
+
+  if (!(arena.hpLowThreshold < arena.hpHighThreshold)) {
+    errors.push('arena.hpLowThreshold must be below arena.hpHighThreshold');
+  }
+
+  ['ammo', 'energy'].forEach((field) => {
+    if (!Number.isInteger(arena.supply?.[field]) || arena.supply[field] < 0) {
+      errors.push(`arena.supply.${field} must be a non negative integer`);
+    }
+  });
+
+  Object.entries(arena.chances || {}).forEach(([type, entry]) => {
+    ['base', 'hpLow', 'hpHigh', 'playerRow'].forEach((field) => {
+      if (entry[field] === undefined) return;
+      if (typeof entry[field] !== 'number' || !Number.isFinite(entry[field]) || entry[field] < 0) {
+        errors.push(`arena.chances.${type}.${field} must be a non negative number`);
+      }
+    });
+
+    // Bolts and energy exist on the player row only, so playerRow replaces base
+    // for them. Everything else must have a base weight for the elder row.
+    const hasBase = typeof entry.base === 'number';
+    const hasPlayerRowOnly = typeof entry.playerRow === 'number' && entry.base === undefined;
+    if (!hasBase && !hasPlayerRowOnly) errors.push(`arena.chances.${type}.base is required`);
+  });
+
+  // The player row has to restock itself, otherwise the Elder fight runs dry.
+  ['AMMO', 'ENERGY'].forEach((type) => {
+    const rate = arena.chances?.[type]?.playerRow;
+    if (typeof rate !== 'number' || rate <= 0) {
+      errors.push(`arena.chances.${type}.playerRow must be positive, the player needs a lifeline`);
+    }
+  });
+
+  if (!(arena.attackCellDamage?.min > 0)) errors.push('arena.attackCellDamage.min must be positive');
+  if (!(arena.attackCellDamage?.max >= arena.attackCellDamage?.min)) {
+    errors.push('arena.attackCellDamage.max must be at least min');
+  }
+
   return errors;
 }
 

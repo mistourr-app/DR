@@ -1,4 +1,4 @@
-import { getGameState } from './state.js';
+﻿import { getGameState } from './state.js';
 import { OBJECT_TYPES, CELL_DEFS } from './registry.js';
 import { DIMS } from './config.js';
 import { calculateAttackOutcome, applyPlayerDamage } from './combat.js';
@@ -115,7 +115,7 @@ export function processBossTurn() {
        if (boss) boss.lastMoveX = oldBossX;
 
       // Spawn an object on the Elder's old position
-      spawnArenaObject(bossCell, oldBossX, boss.pos.y, runState.totalRows, boss.currentHp / boss.hp, runState.random);
+      spawnArenaObject(bossCell, oldBossX, boss.pos.y, runState.totalRows, boss.currentHp / boss.hp, runState.random, runState.rows);
       console.log(`[BOSS_CELL_AFTER] bossCell(${oldBossX}) type=${bossCell.type}`);
 
       console.log(`[BOSS_PICKUP] landedCellType=${landedCellType}, landedCellData=`, landedCellData, 'boss inv:', boss.inventory);

@@ -92,6 +92,44 @@ export const BALANCE = {
       "weight": 1
     }
   },
+  "arena": {
+    "hpLowThreshold": 0.5,
+    "hpHighThreshold": 0.75,
+    "supply": {
+      "ammo": 1,
+      "energy": 1
+    },
+    "chances": {
+      "ATTACK_CELL": {
+        "base": 0.2,
+        "hpLow": 0.1,
+        "hpHigh": 0.3
+      },
+      "ATTACK_BONUS": {
+        "base": 0.2,
+        "hpHigh": 0.25
+      },
+      "DEFENSE_BONUS": {
+        "base": 0.2,
+        "hpLow": 0.25
+      },
+      "HEAL": {
+        "base": 0.25,
+        "hpLow": 0.35,
+        "hpHigh": 0.15
+      },
+      "AMMO": {
+        "playerRow": 0.12
+      },
+      "ENERGY": {
+        "playerRow": 0.14
+      }
+    },
+    "attackCellDamage": {
+      "min": 5,
+      "max": 10
+    }
+  },
   "player": {
     "hp": 20,
     "energy": 10,

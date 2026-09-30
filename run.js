@@ -1,4 +1,4 @@
-import { getGameState, setAppState, createRunId, isRunActive } from './state.js';
+﻿import { getGameState, setAppState, createRunId, isRunActive } from './state.js';
 import { getLevelById, validateLevelDefinition, OBJECT_TYPES, ENEMY_DEFS, CELL_DEFS, CAMPAIGN_CURVE, PLAYER_DEFS, resolvePlayerStats, rollEnemyHp, rollEnemyType } from './registry.js';
 import { DIMS, AppState } from './config.js';
 import { play, clearAnimations, scheduleRunCallback, resizeAnimations } from './animation.js';
@@ -247,7 +247,9 @@ export function startRun(levelId) {
           type = OBJECT_TYPES.GOLD;
         }
       } else if (y >= levelData.rows - 2) {
-        const newObject = generateArenaObject(x, y, levelData.rows, random, 1.0);
+        // The row is still being built, so hand the partial row in: the supply
+        // floor has to see the cells already placed to keep the row stocked.
+        const newObject = generateArenaObject(x, y, levelData.rows, random, 1.0, { rowCells: row });
         type = newObject.type;
         data = newObject.data;
       }
@@ -533,7 +535,7 @@ function processPlayerMove(targetX, targetY) {
         const prevCell = rows[previousY][previousX];
         console.log(`[LEAVE_CELL] (${previousX},${previousY}) type=${prevCell.type}`);
         if (prevCell.type === OBJECT_TYPES.EMPTY) {
-          spawnArenaObject(prevCell, previousX, previousY, runState.totalRows, player.hp / player.maxHp, runState.random);
+          spawnArenaObject(prevCell, previousX, previousY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
         }
       }
       
@@ -554,7 +556,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
           break;
         }
         case OBJECT_TYPES.AMMO: {
@@ -567,7 +569,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
           break;
         }
         case OBJECT_TYPES.ENERGY: {
@@ -580,7 +582,7 @@ function processPlayerMove(targetX, targetY) {
           }
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
           break;
         }
         case OBJECT_TYPES.GOLD: {
@@ -589,7 +591,7 @@ function processPlayerMove(targetX, targetY) {
           createFloatingText(`+${goldAmount} GOLD`, CELL_DEFS[OBJECT_TYPES.GOLD].color, player.visual);
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
-          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+          if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
           break;
         }
         case OBJECT_TYPES.ATTACK_BONUS: {
@@ -600,7 +602,7 @@ function processPlayerMove(targetX, targetY) {
             emit(Events.ITEM_PICKED, { type: 'attack_bonus', value: bonus.value });
             targetCell.type = OBJECT_TYPES.EMPTY;
             targetCell.data = null;
-            if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+            if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
           } else {
             createFloatingText('FULL', '#6b7280', player.visual);
             bossInteractionPending = runState.levelPhase === 'boss_arena';
@@ -614,7 +616,7 @@ function processPlayerMove(targetX, targetY) {
                 targetCell.data = null;
                 targetCell.isAnimating = false;
                 if (runState.levelPhase === 'boss_arena') {
-                  spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+                  spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
                   bossInteractionPending = false;
                   handOffToBoss();
                 }
@@ -631,7 +633,7 @@ function processPlayerMove(targetX, targetY) {
             emit(Events.ITEM_PICKED, { type: 'defense_bonus', value: bonus.value });
             targetCell.type = OBJECT_TYPES.EMPTY;
             targetCell.data = null;
-            if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+            if (runState.levelPhase === 'boss_arena') spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
           } else {
             createFloatingText('FULL', '#6b7280', player.visual);
             bossInteractionPending = runState.levelPhase === 'boss_arena';
@@ -645,7 +647,7 @@ function processPlayerMove(targetX, targetY) {
                 targetCell.data = null;
                 targetCell.isAnimating = false;
                 if (runState.levelPhase === 'boss_arena') {
-                  spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+                  spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
                   bossInteractionPending = false;
                   handOffToBoss();
                 }
@@ -672,7 +674,7 @@ function processPlayerMove(targetX, targetY) {
           targetCell.type = OBJECT_TYPES.EMPTY;
           targetCell.data = null;
           if (runState.levelPhase === 'boss_arena') {
-            spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+            spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
           }
 
           const originalY = player.visual.y;
@@ -751,7 +753,7 @@ function processPlayerMove(targetX, targetY) {
                         if (runState.levelPhase === 'dungeon') {
                           finalizeTurnAfterMove(targetY);
                         } else {
-                          spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random);
+                          spawnArenaObject(targetCell, targetX, targetY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
                           bossInteractionPending = false;
                           handOffToBoss();
                         }
@@ -1000,7 +1002,7 @@ function processMeleeAttack(enemyX, enemyY) {
         if (entersArena) {
           const previousCell = rows[previousY]?.[previousX];
           if (previousCell?.type === OBJECT_TYPES.EMPTY) {
-            spawnArenaObject(previousCell, previousX, previousY, runState.totalRows, player.hp / player.maxHp, runState.random);
+            spawnArenaObject(previousCell, previousX, previousY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
           }
         }
 
@@ -1036,7 +1038,7 @@ function processMeleeAttack(enemyX, enemyY) {
                       targetCell.type = OBJECT_TYPES.EMPTY;
                       targetCell.data = null;
                       if (entersArena) {
-                        spawnArenaObject(targetCell, enemyX, enemyY, runState.totalRows, player.hp / player.maxHp, runState.random);
+                        spawnArenaObject(targetCell, enemyX, enemyY, runState.totalRows, player.hp / player.maxHp, runState.random, runState.rows);
                         handOffToBoss();
                       } else {
                         finalizeTurnAfterMove(enemyY);

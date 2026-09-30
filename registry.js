@@ -375,6 +375,10 @@ function buildCampaignLevels(curve) {
 
 export const CAMPAIGN_LEVELS = buildCampaignLevels(CAMPAIGN_CURVE);
 
+// Elder arena spawn table. Also in balance.csv so the Elder hall can be tuned
+// without touching code.
+export const ARENA_DEFS = BALANCE.arena;
+
 // Temporary level data store.
 // In the future this will be loaded from localStorage or a server.
 export const LEVELS = [...STATIC_LEVELS, ...CAMPAIGN_LEVELS];
