@@ -12,7 +12,9 @@
     "balance:report": "node scripts/build-balance.mjs --print",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "graphics:check": "node scripts/check-graphics.mjs"
+    "graphics:check": "node scripts/check-graphics.mjs",
+    "gen:sprites": "node scripts/gen-sprites.mjs",
+    "sprites:check": "node scripts/gen-sprites.mjs --check"
   },
   "devDependencies": {
     "@types/node": "^24.0.10",

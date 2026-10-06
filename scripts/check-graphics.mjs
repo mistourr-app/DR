@@ -62,7 +62,10 @@ try {
         warnings.push(`${id}: pending (enabled=false)`);
         continue;
       }
-      const filePath = path.resolve(path.dirname(manifestPath), entry.src);
+      // entry.src is relative to the project root ("assets/..."), which is how
+      // the loader resolves it at runtime and how server.js serves it. Joining
+      // it to the manifest's own directory would look for assets/assets/...
+      const filePath = path.resolve(entry.src);
       try {
         const [width, height] = await readPngSize(filePath);
         if (width !== entry.sourceSize[0] || height !== entry.sourceSize[1]) {
